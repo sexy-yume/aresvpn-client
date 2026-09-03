@@ -54,6 +54,11 @@ class WireguardUtilsWindows final : public WireguardUtils {
   void buildMibForwardRow(const IPAddress& prefix, void* row);
 
   quint64 m_luid = 0;
+  // AresVPN Client: the peer public key addInterface() already wrote into the tunnel's
+  // own config. The first updatePeer() for that key must not re-send it over UAPI - the
+  // handshake completes within ~250 ms of tunnel start and a redundant
+  // endpoint/replace_allowed_ips set right after tears the fresh session down.
+  QString m_peerConfiguredAtStart;
   WindowsTunnelService m_tunnel;
   QPointer<WindowsRouteMonitor> m_routeMonitor;
   QPointer<WindowsFirewall> m_firewall;

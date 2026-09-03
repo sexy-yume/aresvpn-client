@@ -102,18 +102,20 @@ bool WireguardUtilsWindows::addInterface(const InterfaceConfig& config) {
     return false;
   }
 
-  // We don't want to pass a peer just yet, that will happen later with
-  // a UAPI command in WireguardUtilsWindows::updatePeer(), so truncate
-  // the config file to remove the [Peer] section.
-  qsizetype peerStart = configString.indexOf("[Peer]", 0, Qt::CaseSensitive);
-  if (peerStart >= 0) {
-    configString.truncate(peerStart);
-  }
+  // AresVPN Client: upstream truncates the [Peer] section here and adds the peer
+  // afterwards with a UAPI command in WireguardUtilsWindows::updatePeer(). We keep it.
+  // The peer therefore exists when the tunnel starts, which is what the official
+  // WireGuard client does and is the ONE structural difference left between it and
+  // us after every other cause was measured and killed
+  // (AresProject docs/reviews/2026-09-04-client-wireguard-connect-diagnosis.md).
+  // updatePeer() still runs and is idempotent - it re-sets the same peer and is the
+  // only thing that carries the preshared key, which toWgConf() does not write.
 
   if (!m_tunnel.start(configString)) {
     logger.error() << "Failed to activate the tunnel service";
     return false;
   }
+  m_peerConfiguredAtStart = config.m_serverPublicKey;
 
   // Determine the interface LUID
   NET_LUID luid;
@@ -191,6 +193,19 @@ bool WireguardUtilsWindows::updatePeer(const InterfaceConfig& config) {
   if (m_routeMonitor && config.m_hopType != InterfaceConfig::MultiHopExit) {
     m_routeMonitor->addExclusionRoute(IPAddress(config.m_serverIpv4AddrIn));
     m_routeMonitor->addExclusionRoute(IPAddress(config.m_serverIpv6AddrIn));
+  }
+
+  // AresVPN Client: addInterface() already wrote this peer into the tunnel's own config,
+  // so the handshake is up before we get here (~250 ms). Re-sending endpoint +
+  // replace_allowed_ips for the SAME key tears that fresh session down and the peer then
+  // waits out a 15 s "stopped hearing back" timeout. The firewall rules and the exclusion
+  // routes above still run; only the redundant UAPI set is skipped, and only once, so
+  // later roaming or endpoint changes take effect normally.
+  if (!m_peerConfiguredAtStart.isEmpty() &&
+      m_peerConfiguredAtStart == config.m_serverPublicKey) {
+    m_peerConfiguredAtStart.clear();
+    logger.debug() << "Peer was configured at tunnel start; skipping redundant UAPI set";
+    return true;
   }
 
   QString reply = m_tunnel.uapiCommand(message);

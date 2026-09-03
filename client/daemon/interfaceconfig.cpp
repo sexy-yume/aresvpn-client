@@ -193,6 +193,12 @@ QString InterfaceConfig::toWgConf(const QMap<QString, QString>& extra) const {
 
   out << "\n[Peer]\n";
   out << "PublicKey = " << m_serverPublicKey << "\n";
+  // AresVPN Client: the peer now reaches the tunnel through THIS config rather than
+  // through a later UAPI set (see WireguardUtilsWindows::addInterface), so the preshared
+  // key has to travel here too or a PSK-carrying rent would silently lose it.
+  if (!m_serverPskKey.isEmpty()) {
+    out << "PresharedKey = " << m_serverPskKey << "\n";
+  }
   out << "Endpoint = " << m_serverIpv4AddrIn.toUtf8() << ":" << m_serverPort
       << "\n";
 

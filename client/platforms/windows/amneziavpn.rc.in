@@ -3,14 +3,14 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 IDI_ICON1               ICON                    "../../images/app.ico"
 
-#define VER_COMPANYNAME_STR         "AmneziaVPN"
-#define VER_FILEDESCRIPTION_STR     VER_COMPANYNAME_STR
-#define VER_INTERNALNAME_STR        VER_COMPANYNAME_STR
-#define VER_LEGALCOPYRIGHT_STR      "AmneziaVPN."
+#define VER_COMPANYNAME_STR         "AresVPN"
+#define VER_FILEDESCRIPTION_STR     "AresVPN Client"
+#define VER_INTERNALNAME_STR        "AresVPNClient"
+#define VER_LEGALCOPYRIGHT_STR      "(c) AresVPN. Portions (c) AmneziaVPN, Mozilla and others - GPL-3.0"
 #define VER_LEGALTRADEMARKS1_STR    "All Rights Reserved"
 #define VER_LEGALTRADEMARKS2_STR    VER_LEGALTRADEMARKS1_STR
-#define VER_ORIGINALFILENAME_STR    "amneziavpn.exe"
-#define VER_PRODUCTNAME_STR         VER_COMPANYNAME_STR
+#define VER_ORIGINALFILENAME_STR    "AresVPNClient.exe"
+#define VER_PRODUCTNAME_STR         "AresVPN Client"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION     @CMAKE_PROJECT_VERSION_MAJOR@,@CMAKE_PROJECT_VERSION_MINOR@,@CMAKE_PROJECT_VERSION_PATCH@,@CMAKE_PROJECT_VERSION_TWEAK@
@@ -21,7 +21,7 @@ BEGIN
         BLOCK "040904E4"
         BEGIN
             VALUE "CompanyName",        VER_COMPANYNAME_STR
-            VALUE "FileDescription",    "@CMAKE_PROJECT_DESCRIPTION@"
+            VALUE "FileDescription",    VER_FILEDESCRIPTION_STR
             VALUE "FileVersion",        "@CMAKE_PROJECT_VERSION@"
             VALUE "InternalName",       VER_INTERNALNAME_STR
             VALUE "LegalCopyright",     VER_LEGALCOPYRIGHT_STR

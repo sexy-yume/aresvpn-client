@@ -1,5 +1,5 @@
-sc stop AmneziaWGTunnel$AmneziaVPN
-sc delete AmneziaWGTunnel$AmneziaVPN
-taskkill /IM "AmneziaVPN-service.exe" /F
-taskkill /IM "AmneziaVPN.exe" /F
+sc stop AmneziaWGTunnel$AresVPN
+sc delete AmneziaWGTunnel$AresVPN
+taskkill /IM "AresVPNClient-service.exe" /F
+taskkill /IM "AresVPNClient.exe" /F
 exit /b 0

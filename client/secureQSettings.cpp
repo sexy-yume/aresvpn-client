@@ -15,10 +15,10 @@
 using namespace QKeychain;
 
 namespace {
-    constexpr const char *settingsKeyTag = "settingsKeyTag";
-    constexpr const char *settingsIvTag = "settingsIvTag";
+    constexpr const char *settingsKeyTag = "AresVPNClient/settingsKeyTag";
+    constexpr const char *settingsIvTag = "AresVPNClient/settingsIvTag";
 #ifndef CLIENT_KEYCHAIN_NAME_STR
-#define CLIENT_KEYCHAIN_NAME_STR "AmneziaVPN-Keychain"
+#define CLIENT_KEYCHAIN_NAME_STR "AresVPNClient-Keychain"
 #endif
     constexpr const char *keyChainName = CLIENT_KEYCHAIN_NAME_STR;
 }

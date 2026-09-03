@@ -34,10 +34,8 @@
 #define IPV6_ADDRESS_SIZE 16
 
 // ID for the Firewall Sublayer
-DEFINE_GUID(ST_FW_WINFW_BASELINE_SUBLAYER_KEY, 0xc78056ff, 0x2bc1, 0x4211, 0xaa,
-            0xdd, 0x7f, 0x35, 0x8d, 0xef, 0x20, 0x2d);
-DEFINE_GUID(ST_FW_WINFW_DNS_SUBLAYER_KEY, 0x60090787, 0xcca1, 0x4937, 0xaa,
-            0xce, 0x51, 0x25, 0x6e, 0xf4, 0x81, 0xf3);
+DEFINE_GUID(ST_FW_WINFW_BASELINE_SUBLAYER_KEY, 0xe54e4551, 0x4cb5, 0x4519, 0xbb, 0xdb, 0xce, 0x5a, 0x86, 0xeb, 0x1d, 0x52);  // AresVPN Client: a fresh key - ensureSublayer() treats an existing key as ours (survey 8.7)
+DEFINE_GUID(ST_FW_WINFW_DNS_SUBLAYER_KEY, 0x4289da56, 0x6c5b, 0x470e, 0x9a, 0x73, 0x2f, 0x50, 0x57, 0x00, 0x72, 0xff);
 // ID for the Mullvad Split-Tunnel Sublayer Provider
 DEFINE_GUID(ST_FW_PROVIDER_KEY, 0xe2c114ee, 0xf32a, 0x4264, 0xa6, 0xcb, 0x3f,
             0xa7, 0x99, 0x63, 0x56, 0xd9);
@@ -166,10 +164,10 @@ bool WindowsFirewall::initSublayer() {
   auto cleanup = qScopeGuard([&] { FwpmEngineClose0(wfp); });
 
   return ensureSublayer(wfp, ST_FW_WINFW_BASELINE_SUBLAYER_KEY,
-                        L"Amnezia-SplitTunnel-Sublayer",
+                        L"AresVPN-SplitTunnel-Sublayer",
                         L"Filters that enforce a good baseline") &&
          ensureSublayer(wfp, ST_FW_WINFW_DNS_SUBLAYER_KEY,
-                        L"Amnezia-SplitTunnel-DNS-Sublayer",
+                        L"AresVPN-SplitTunnel-DNS-Sublayer",
                         L"DNS filters for split tunneling");
 }
 
@@ -215,7 +213,7 @@ bool WindowsFirewall::enableInterface(int vpnAdapterIndex) {
   FW_OK(allowDHCPTraffic(MED_WEIGHT, "Allow DHCP Traffic"));
   FW_OK(allowHyperVTraffic(MAX_WEIGHT, "Allow Hyper-V Traffic"));
   FW_OK(allowTrafficForAppOnAll(getCurrentPath(), MAX_WEIGHT,
-                                "Allow all for AmneziaVPN.exe"));
+                                "Allow all for AresVPNClient.exe"));
   FW_OK(blockTrafficOnPort(53, MED_WEIGHT, "Block all DNS"));
   FW_OK(allowLoopbackTraffic(MED_WEIGHT,
                              "Allow Loopback traffic on device %1"));

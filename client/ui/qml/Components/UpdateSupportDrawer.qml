@@ -57,7 +57,7 @@ DrawerType2 {
                 rightImageSource: "qrc:/images/controls/chevron-right.svg"
 
                 clickedFunction: function() {
-                    Qt.openUrlExternally(qsTr("https://t.me/amnezia_vpn_en"))
+                    Qt.openUrlExternally(qsTr("https://ares-vpn.org/support"))
                 }
             }
 
@@ -66,13 +66,13 @@ DrawerType2 {
             LabelWithButtonType {
                 Layout.fillWidth: true
 
-                text: qsTr("support@amnezia.org")
+                text: qsTr("support@ares-vpn.org")
                 descriptionText: qsTr("Support email")
                 leftImageSource: "qrc:/images/controls/mail.svg"
                 rightImageSource: "qrc:/images/controls/chevron-right.svg"
 
                 clickedFunction: function() {
-                    Qt.openUrlExternally(qsTr("mailto:support@amnezia.org"))
+                    Qt.openUrlExternally(qsTr("mailto:support@ares-vpn.org"))
                 }
             }
 
@@ -81,7 +81,7 @@ DrawerType2 {
             LabelWithButtonType {
                 Layout.fillWidth: true
 
-                text: qsTr("amnezia.org")
+                text: qsTr("ares-vpn.org")
                 descriptionText: qsTr("Download the update manually")
                 leftImageSource: "qrc:/images/controls/amnezia.svg"
                 rightImageSource: "qrc:/images/controls/chevron-right.svg"

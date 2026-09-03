@@ -25,7 +25,7 @@ PageType {
     function saveConfigToFile(json) {
         var fileName = ""
         if (GC.isMobile()) {
-            fileName = "amnezia_xray_config.json"
+            fileName = "aresvpn_xray_config.json"
         } else {
             fileName = SystemController.getFileName(
                 qsTr("Save XRay configuration"),

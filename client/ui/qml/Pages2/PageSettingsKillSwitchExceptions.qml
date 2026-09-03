@@ -189,7 +189,7 @@ PageType {
                 clickedFunction: function() {
                     var fileName = ""
                     if (GC.isMobile()) {
-                        fileName = "amnezia_killswitch_exceptions.json"
+                        fileName = "aresvpn_killswitch_exceptions.json"
                     } else {
                         fileName = SystemController.getFileName(qsTr("Save addresses"),
                                                                 qsTr("Address files (*.json)"),

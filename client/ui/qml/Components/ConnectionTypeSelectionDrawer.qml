@@ -38,6 +38,7 @@ DrawerType2 {
 
         LabelWithButtonType {
             id: ip
+            visible: false  // AresVPN Client: the self-hosted install flow is not this product (#D177 rule 3)
             Layout.fillWidth: true
             Layout.topMargin: 16
 

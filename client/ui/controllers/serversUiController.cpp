@@ -275,6 +275,9 @@ bool ServersUiController::isDefaultServerFromApi() const
 
 bool ServersUiController::hasServerWithWriteAccess() const
 {
+    // AresVPN Client: nothing has write access - the SSH-driven server management is not this product
+    // (AresProject #D177 rule 3, survey 4.5-4.6). The classification still happens in core; the UI gate is here.
+    return false;
     for (const auto &description : m_orderedServerDescriptions) {
         if (description.hasWriteAccess) {
             return true;
@@ -311,6 +314,8 @@ bool ServersUiController::isServerCountrySelectionAvailable(const QString &serve
 
 bool ServersUiController::isServerHasWriteAccess(const QString &serverId) const
 {
+    Q_UNUSED(serverId);
+    return false;  // AresVPN Client: see hasServerWithWriteAccess()
     return serverDescriptionById(serverId).hasWriteAccess;
 }
 

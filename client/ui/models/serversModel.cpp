@@ -70,7 +70,7 @@ QVariant ServersModel::data(const QModelIndex &index, int role) const
     case IsDefaultRole:
         return row.serverId == m_defaultServerId;
     case HasWriteAccessRole:
-        return row.hasWriteAccess;
+        return false;  // AresVPN Client: see ServersUiController::hasServerWithWriteAccess()
     case DefaultContainerRole:
         return QVariant::fromValue(row.defaultContainer);
     case HasInstalledContainers:

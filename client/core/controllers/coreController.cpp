@@ -297,6 +297,11 @@ void CoreController::initSignalHandlers()
 
 void CoreController::checkForAppUpdates()
 {
+    // AresVPN Client: the in-app updater is Amnezia's gateway (gw.amnezia.org, an encrypted
+    // envelope against a compiled-in key this fork does not carry). It never fires here - an AresVPN
+    // update channel, when it exists, is a new controller with a signature check (AresProject
+    // ROADMAP 18-3d/18-3e, survey 4.2). Kept as a single early return so the file merges clean.
+    return;
     if (!m_appSettingsRepository->isAutoUpdateCheckEnabled()) {
         return;
     }

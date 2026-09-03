@@ -285,7 +285,7 @@ PageType {
         property string description: qsTr("The easiest way to connect to the VPN")
         property string imageSource: "qrc:/images/controls/amnezia.svg"
         property bool featuredAmneziaConnection: true
-        property bool isVisible: true
+        property bool isVisible: false  // AresVPN Client: the Premium catalogue is not this product (AresProject #D177 rule 3); the AresVPN login card takes this slot in 18-3c
         property var handler: function() {
             PageController.showBusyIndicator(true)
             var result = SubscriptionUiController.fillAvailableServices()
@@ -303,7 +303,7 @@ PageType {
         property string title: qsTr("Self-hosted VPN")
         property string description: qsTr("Configure Amnezia VPN on your own server")
         property string imageSource: "qrc:/images/controls/server.svg"
-        property bool isVisible: true
+        property bool isVisible: false  // AresVPN Client: the self-hosted install flow is not this product (#D177 rule 3)
         property var handler: function() {
             PageController.goToPage(PageEnum.PageSetupWizardCredentials)
         }
@@ -377,7 +377,7 @@ PageType {
         property string title: qsTr("Restore purchases")
         property string description: qsTr("")
         property string imageSource: "qrc:/images/controls/refresh-cw.svg"
-        property bool isVisible: Qt.platform.os === "ios" || IsMacOsNeBuild || IsPlayBuild
+        property bool isVisible: false  // AresVPN Client: no store purchases to restore (#D177 rule 3)
         property var handler: function() {
             PageController.showBusyIndicator(true)
             SubscriptionUiController.restoreServiceFromStore()

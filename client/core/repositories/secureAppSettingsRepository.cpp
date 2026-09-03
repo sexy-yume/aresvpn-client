@@ -284,6 +284,21 @@ void SecureAppSettingsRepository::setGatewayEndpoint(const QString &endpoint)
     setValue("Conf/gatewayEndpoint", endpoint);
 }
 
+QString SecureAppSettingsRepository::getAresEndpoint() const
+{
+    return value("Conf/aresEndpoint", QString()).toString();
+}
+
+void SecureAppSettingsRepository::setAresEndpoint(const QString &endpoint)
+{
+    setValue("Conf/aresEndpoint", endpoint.trimmed());
+}
+
+void SecureAppSettingsRepository::resetAresEndpoint()
+{
+    setValue("Conf/aresEndpoint", QString());
+}
+
 void SecureAppSettingsRepository::resetGatewayEndpoint()
 {
     m_gatewayEndpoint = gatewayEndpoint;

@@ -135,6 +135,12 @@ QString errorString(ErrorCode code) {
     case(ErrorCode::SubscriptionUnavailable): errorMessage = QObject::tr("The requested subscription is not available for purchase"); break;
     case(ErrorCode::BillingNetworkError): errorMessage = QObject::tr("A network error occurred during the operation, please check the Internet connection"); break;
 
+    // AresVPN Client
+    case(ErrorCode::AresBadCredentials): errorMessage = QObject::tr("The AresVPN console did not accept this id and password"); break;
+    case(ErrorCode::AresNoSuchRent): errorMessage = QObject::tr("No rent with this idx under your account"); break;
+    case(ErrorCode::AresEndpointUnreachable): errorMessage = QObject::tr("The AresVPN console could not be reached"); break;
+    case(ErrorCode::AresRentNotImportable): errorMessage = QObject::tr("This rent cannot be used from this app"); break;
+
     case(ErrorCode::InternalError):
     default:
         errorMessage = QObject::tr("Internal error"); break;

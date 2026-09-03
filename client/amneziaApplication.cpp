@@ -1,6 +1,7 @@
 #include "amneziaApplication.h"
 
 #include <QClipboard>
+#include <QTextStream>  // AresVPN Client: --ares-login
 #include <QFontDatabase>
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -43,7 +44,8 @@ AmneziaApplication::AmneziaApplication(int &argc, char *argv[]) : AMNEZIA_BASE_C
       m_optAutostart({QStringLiteral("a"), QStringLiteral("autostart")}, QStringLiteral("System autostart")),
       m_optCleanup  ({QStringLiteral("c"), QStringLiteral("cleanup")}, QStringLiteral("Cleanup logs")),
       m_optConnect  ({QStringLiteral("connect")}, QStringLiteral("Connect to server by index on startup"), QStringLiteral("index")),
-      m_optImport   ({QStringLiteral("import")}, QStringLiteral("Import configuration from data string"), QStringLiteral("data"))
+      m_optImport   ({QStringLiteral("import")}, QStringLiteral("Import configuration from data string"), QStringLiteral("data")),
+      m_optAresLogin({QStringLiteral("ares-login")}, QStringLiteral("AresVPN Client: read id, password and idx as three lines from stdin, store the rent, exit"))
 {
     setDesktopFileName(QStringLiteral(APPLICATION_NAME));
     setQuitOnLastWindowClosed(false);
@@ -175,6 +177,22 @@ void AmneziaApplication::init()
         }
     }
 
+    if (m_parser.isSet(m_optAresLogin) && m_coreController) {
+        // AresVPN Client: headless login, the test vector for /api/profile (AresProject ROADMAP 18-3c)
+        QTextStream in(stdin);
+        const QString id = in.readLine();
+        const QString pw = in.readLine();
+        const QString idx = in.readLine();
+        const AresProfileController::Result r = m_coreController->aresProfileController()->fetchAndImport(id, pw, idx);
+        QTextStream out(stdout);
+        if (r.errorCode == amnezia::ErrorCode::NoError) {
+            out << "ARES-LOGIN OK rent=" << r.rentId << " protocol=" << r.protocol << " server=" << r.serverId << Qt::endl;
+            ::exit(0);
+        }
+        out << "ARES-LOGIN REFUSED code=" << static_cast<int>(r.errorCode) << " message=" << r.message << Qt::endl;
+        ::exit(3);
+    }
+
     m_engine->load(url);
 
     m_coreController->setQmlRoot();
@@ -269,6 +287,7 @@ bool AmneziaApplication::parseCommands()
     m_parser.addOption(m_optCleanup);
     m_parser.addOption(m_optConnect);
     m_parser.addOption(m_optImport);
+    m_parser.addOption(m_optAresLogin);
     
     m_parser.process(*this);
 

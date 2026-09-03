@@ -27,6 +27,7 @@ set(HEADERS ${HEADERS}
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/installController.h
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/exportController.h
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/importController.h
+    ${CLIENT_ROOT_DIR}/core/controllers/aresProfileController.h
     ${CLIENT_ROOT_DIR}/core/installers/installerBase.h
     ${CLIENT_ROOT_DIR}/core/installers/awgInstaller.h
     ${CLIENT_ROOT_DIR}/core/installers/wireguardInstaller.h
@@ -110,6 +111,7 @@ set(SOURCES ${SOURCES}
     ${CLIENT_ROOT_DIR}/core/controllers/serversController.cpp
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/usersController.cpp
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/installController.cpp
+    ${CLIENT_ROOT_DIR}/core/controllers/aresProfileController.cpp
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/exportController.cpp
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/importController.cpp
     ${CLIENT_ROOT_DIR}/core/installers/installerBase.cpp

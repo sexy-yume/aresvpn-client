@@ -51,6 +51,7 @@ namespace PageLoader
 
         PageSetupWizardStart,
         PageSetupWizardCredentials,
+        PageSetupWizardAresLogin,  // AresVPN Client
         PageSetupWizardProtocols,
         PageSetupWizardEasy,
         PageSetupWizardProtocolSettings,

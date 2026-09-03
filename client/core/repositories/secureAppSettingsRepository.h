@@ -64,6 +64,11 @@ public:
     bool isDevGatewayEnv(bool isTestPurchase = false) const;
     void toggleDevGatewayEnv(bool enabled);
     QByteArray readGatewayProxyUrls(const QString &cacheKey) const;
+
+    // AresVPN Client: the console's base URL (Conf/aresEndpoint), empty = the compiled default
+    QString getAresEndpoint() const;
+    void setAresEndpoint(const QString &endpoint);
+    void resetAresEndpoint();
     void writeGatewayProxyUrls(const QString &cacheKey, const QByteArray &proxyUrlsEncrypted);
 
     bool isKillSwitchEnabled() const;

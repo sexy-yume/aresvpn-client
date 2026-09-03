@@ -167,6 +167,7 @@ void CoreController::initCoreControllers()
     m_installController = new InstallController(m_serversRepository, m_appSettingsRepository, this);
     m_exportController = new ExportController(m_serversRepository, m_appSettingsRepository, this);
     m_importCoreController = new ImportController(m_serversRepository, m_appSettingsRepository, this);
+    m_aresProfileController = new AresProfileController(m_importCoreController, m_serversRepository, m_appSettingsRepository, this);  // AresVPN Client
     m_connectionController = new ConnectionController(m_serversRepository, m_appSettingsRepository, m_vpnConnection.get(), this);
     m_settingsController = new SettingsController(m_serversRepository, m_appSettingsRepository, this);
 }
@@ -193,6 +194,9 @@ void CoreController::initControllers()
 
     m_importController = new ImportUiController(m_importCoreController, this);
     setQmlContextProperty("ImportController", m_importController);
+
+    m_aresProfileUiController = new AresProfileUiController(m_aresProfileController, this);  // AresVPN Client
+    setQmlContextProperty("AresProfileController", m_aresProfileUiController);
 
     m_exportUiController = new ExportUiController(m_exportController, this);
     setQmlContextProperty("ExportController", m_exportUiController);

@@ -281,18 +281,15 @@ PageType {
     QtObject {
         id: amneziaVpn
 
-        property string title: qsTr("VPN by Amnezia")
-        property string description: qsTr("The easiest way to connect to the VPN")
+        // AresVPN Client: this slot was the "VPN by Amnezia" Premium catalogue card (not this
+        // product, AresProject #D177 rule 3); it is the AresVPN account login now (18-3c).
+        property string title: qsTr("AresVPN account")
+        property string description: qsTr("Log in with your id, password and a rent idx")
         property string imageSource: "qrc:/images/controls/amnezia.svg"
         property bool featuredAmneziaConnection: true
-        property bool isVisible: false  // AresVPN Client: the Premium catalogue is not this product (AresProject #D177 rule 3); the AresVPN login card takes this slot in 18-3c
+        property bool isVisible: true
         property var handler: function() {
-            PageController.showBusyIndicator(true)
-            var result = SubscriptionUiController.fillAvailableServices()
-            PageController.showBusyIndicator(false)
-            if (result) {
-                PageController.goToPage(PageEnum.PageSetupWizardApiServicesList)
-            }
+            PageController.goToPage(PageEnum.PageSetupWizardAresLogin)
         }
     }
 

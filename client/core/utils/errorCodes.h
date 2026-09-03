@@ -126,6 +126,12 @@ namespace amnezia
         SubscriptionAlreadyOwned = 1304,
         SubscriptionUnavailable = 1305,
         BillingNetworkError = 1306,
+
+        // AresVPN Client - the /api/profile login (AresProject #D173, #D180)
+        AresBadCredentials = 1400,
+        AresNoSuchRent = 1401,
+        AresEndpointUnreachable = 1402,
+        AresRentNotImportable = 1403,
       };
       Q_ENUM_NS(ErrorCode)
     }

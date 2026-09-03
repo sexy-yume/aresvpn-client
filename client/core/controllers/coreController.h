@@ -19,6 +19,8 @@
 #include "ui/controllers/qml/focusController.h"
 #include "ui/controllers/importUiController.h"
 #include "core/controllers/selfhosted/importController.h"
+#include "core/controllers/aresProfileController.h"  // AresVPN Client
+#include "ui/controllers/aresProfileUiController.h"
 #include "ui/controllers/selfhosted/installUiController.h"
 #include "ui/controllers/qml/pageController.h"
 #include "ui/controllers/settingsUiController.h"
@@ -101,6 +103,7 @@ public:
 
     void openConnectionByIndex(int serverIndex);
     void importConfigFromData(const QString &data);
+    AresProfileController* aresProfileController() const { return m_aresProfileController; }  // AresVPN Client: the headless login uses it
     void updateTranslator(const QLocale &locale);
 
 signals:
@@ -168,6 +171,8 @@ private:
     InstallUiController* m_installUiController;
     ImportUiController* m_importController;
     ImportController* m_importCoreController;
+    AresProfileController* m_aresProfileController = nullptr;      // AresVPN Client
+    AresProfileUiController* m_aresProfileUiController = nullptr;
     ExportUiController* m_exportUiController;
     SettingsUiController* m_settingsUiController;
     ServersUiController* m_serversUiController;

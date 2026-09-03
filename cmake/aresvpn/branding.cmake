@@ -19,6 +19,9 @@ set(CLIENT_ORGANIZATION_NAME  "AresVPN"                CACHE STRING "QSettings o
 set(CLIENT_APP_INSTANCE_NAME  "AresVPNClientInstance"  CACHE STRING "Single-instance local server name")
 set(CLIENT_KEYCHAIN_NAME      "AresVPNClient-Keychain" CACHE STRING "QtKeychain service name used for encrypted settings keys")
 set(CLIENT_ANDROID_PACKAGE    "org.aresvpn.client"     CACHE STRING "Android package name for Play Store version lookup")
+# The AresVPN console the client logs in to (POST /api/profile). Overridable at runtime through
+# Conf/aresEndpoint (the dev menu); this is the compiled default (AresProject #D142, #D173).
+set(CLIENT_ARES_ENDPOINT      "https://console.ares-vpn.org:8080" CACHE STRING "AresVPN console base URL")
 
 # Translations keep upstream's prefix until the derived-.ts mechanism exists (AresProject ROADMAP
 # 18-3b, survey 8.8 mechanism 3): the runtime looks up `<prefix>_<locale>.qm`, and the files under

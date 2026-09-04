@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/ui/qml">
+        <file>Components/AresRow.qml</file>
         <file>Components/UpdateSupportDrawer.qml</file>
         <file>Components/AdLabel.qml</file>
         <file>Components/ConnectButton.qml</file>

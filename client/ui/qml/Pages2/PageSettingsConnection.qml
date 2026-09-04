@@ -1,3 +1,18 @@
+// AresVPN Client - Settings > Connection, REBUILT (AresProject ROADMAP 18-3h, #D182).
+// Copyright (c) 2026 AresVPN. Licensed under the GNU General Public License v3.0 (see LICENSE).
+//
+// What the tunnel does to THIS machine: what it resolves with, what it carries, and what happens
+// when it drops. Every row here is real for a rent.
+//
+// ONE ROW CAME OUT, and it was measured before it was removed rather than after. Upstream's first
+// switch is "Use AresDNS - if AresDNS is installed on the server", and its value reaches exactly
+// one decision: selfHostedAdminServerConfig.cpp's
+//     d1 = (isAmneziaDnsEnabled && dnsOnServer) ? amneziaDnsIp : primaryDns
+// `dnsOnServer` is true only for a self-hosted server carrying that container. A rent is an
+// imported configuration and has none, so the switch could never change anything here - it was a
+// control that did nothing, which is worse than an absent one (the same argument that hid the
+// update toggle in Settings > Application). Its setting is untouched, so it returns the day a
+// node offers DNS.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -7,150 +22,92 @@ import Style 1.0
 
 import "./"
 import "../Controls2"
+import "../Components"
 import "../Config"
 
 PageType {
     id: root
 
-    property bool isAppSplitTinnelingEnabled: Qt.platform.os === "windows" || Qt.platform.os === "android"
+    readonly property bool appSplitTunnelingAvailable: Qt.platform.os === "windows" || Qt.platform.os === "android"
 
-    BackButtonType {
-        id: backButton
-
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.topMargin: 20 + PageController.safeAreaTopMargin
-
-        onActiveFocusChanged: {
-            if(backButton.enabled && backButton.activeFocus) {
-                listView.positionViewAtBeginning()
-            }
-        }
+    Rectangle {
+        anchors.fill: parent
+        color: AresStyle.color.bg
     }
 
-    ListViewType {
-        id: listView
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.topMargin: PageController.safeAreaTopMargin
+        spacing: 0
 
-        anchors.top: backButton.bottom
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-
-        header: ColumnLayout {
-
-            width: listView.width
-
-            BaseHeaderType {
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-
-                headerText: qsTr("Connection")
-            }
+        BackButtonType {
+            id: backButton
+            Layout.fillWidth: true
+            Layout.topMargin: AresStyle.space.lg
         }
 
-        model: 1 // fake model to force the ListView to be created without a model
-
-        delegate: ColumnLayout { // TODO(CyAn84): add DelegateChooser when have migrated to 6.9
-
-            width: listView.width
-
-            SwitcherType {
-                id: amneziaDnsSwitch
-
-                Layout.fillWidth: true
-                Layout.margins: 16
-
-                text: qsTr("Use AresDNS")
-                descriptionText: qsTr("If AresDNS is installed on the server")
-
-                checked: SettingsController.isAmneziaDnsEnabled()
-                onToggled: function() {
-                    if (checked !== SettingsController.isAmneziaDnsEnabled()) {
-                        SettingsController.toggleAmneziaDns(checked)
-                    }
-                }
-            }
-
-            DividerType {}
-
-            LabelWithButtonType {
-                id: dnsServersButton
-
-                Layout.fillWidth: true
-
-                text: qsTr("DNS servers")
-                descriptionText: qsTr("When AresDNS is not used or installed")
-                rightImageSource: "qrc:/images/controls/chevron-right.svg"
-
-                clickedFunction: function() {
-                    PageController.goToPage(PageEnum.PageSettingsDns)
-                }
-            }
-
-            DividerType {}
-
-            LabelWithButtonType {
-                id: splitTunnelingButton
-
-                Layout.fillWidth: true
-
-                text: qsTr("Site-based split tunneling")
-                descriptionText: qsTr("Allows you to select which sites you want to access through the VPN")
-                rightImageSource: "qrc:/images/controls/chevron-right.svg"
-
-                clickedFunction: function() {
-                    PageController.goToPage(PageEnum.PageSettingsSplitTunneling)
-                }
-            }
-
-            DividerType {}
-
+        Text {
+            Layout.fillWidth: true
+            Layout.leftMargin: AresStyle.space.lg
+            Layout.rightMargin: AresStyle.space.lg
+            Layout.topMargin: AresStyle.space.sm
+            text: qsTr("Connection")
+            color: AresStyle.color.text
+            font.family: AresStyle.font.family
+            font.pixelSize: AresStyle.size.title
+            font.weight: Font.DemiBold
         }
 
-        footer: ColumnLayout { // TODO(CyAn84): move to delegate,add DelegateChooser when have migrated to 6.9
+        Text {
+            Layout.fillWidth: true
+            Layout.leftMargin: AresStyle.space.lg
+            Layout.rightMargin: AresStyle.space.lg
+            Layout.topMargin: 2
+            Layout.bottomMargin: AresStyle.space.lg
+            text: qsTr("What the tunnel does to this machine.")
+            color: AresStyle.color.textMute
+            font.family: AresStyle.font.family
+            font.pixelSize: AresStyle.size.small
+            wrapMode: Text.WordWrap
+        }
 
-            width: listView.width
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: AresStyle.space.lg
+            Layout.rightMargin: AresStyle.space.lg
+            spacing: AresStyle.space.sm
 
-            LabelWithButtonType {
-                id: splitTunnelingButton2
-
-                visible: root.isAppSplitTinnelingEnabled
-
+            AresRow {
                 Layout.fillWidth: true
-
-                text: qsTr("App-based split tunneling")
-                descriptionText: qsTr("Allows you to use the VPN only for certain Apps")
-                rightImageSource: "qrc:/images/controls/chevron-right.svg"
-
-                clickedFunction: function() {
-                    PageController.goToPage(PageEnum.PageSettingsAppSplitTunneling)
-                }
+                title: qsTr("DNS servers")
+                subtitle: qsTr("Which resolver this device uses while connected")
+                onClicked: PageController.goToPage(PageEnum.PageSettingsDns)
             }
 
-            DividerType {
-                visible: root.isAppSplitTinnelingEnabled
-            }
-
-            LabelWithButtonType {
-                id: killSwitchButton
-                visible: !GC.isMobile()
-
+            AresRow {
                 Layout.fillWidth: true
-
-                text: qsTr("KillSwitch")
-                descriptionText: qsTr("Blocks network connections without VPN")
-                rightImageSource: "qrc:/images/controls/chevron-right.svg"
-
-                clickedFunction: function() {
-                    PageController.goToPage(PageEnum.PageSettingsKillSwitch)
-                }
+                title: qsTr("Split tunnelling by site")
+                subtitle: qsTr("Choose which sites go through the rent")
+                onClicked: PageController.goToPage(PageEnum.PageSettingsSplitTunneling)
             }
 
-            DividerType {
+            AresRow {
+                Layout.fillWidth: true
+                visible: root.appSplitTunnelingAvailable
+                title: qsTr("Split tunnelling by app")
+                subtitle: qsTr("Choose which applications go through the rent")
+                onClicked: PageController.goToPage(PageEnum.PageSettingsAppSplitTunneling)
+            }
+
+            AresRow {
+                Layout.fillWidth: true
                 visible: GC.isDesktop()
+                title: qsTr("Kill switch")
+                subtitle: qsTr("Cut this device off the network if the tunnel drops")
+                onClicked: PageController.goToPage(PageEnum.PageSettingsKillSwitch)
             }
         }
+
+        Item { Layout.fillHeight: true }
     }
 }

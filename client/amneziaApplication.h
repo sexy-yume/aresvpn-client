@@ -67,6 +67,7 @@ private:
     QCommandLineOption m_optConnect;
     QCommandLineOption m_optImport;
     QCommandLineOption m_optAresLogin;  // AresVPN Client: headless login from stdin
+    QCommandLineOption m_optQmlSmoke;   // AresVPN Client: compile every page and report, then exit
 
     QSharedPointer<VpnConnection> m_vpnConnection;
     QThread m_vpnConnectionThread;

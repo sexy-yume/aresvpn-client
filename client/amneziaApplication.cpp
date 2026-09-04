@@ -6,6 +6,8 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMimeData>
+#include <QQmlComponent>
+#include <QMetaEnum>
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QResource>
@@ -45,7 +47,8 @@ AmneziaApplication::AmneziaApplication(int &argc, char *argv[]) : AMNEZIA_BASE_C
       m_optCleanup  ({QStringLiteral("c"), QStringLiteral("cleanup")}, QStringLiteral("Cleanup logs")),
       m_optConnect  ({QStringLiteral("connect")}, QStringLiteral("Connect to server by index on startup"), QStringLiteral("index")),
       m_optImport   ({QStringLiteral("import")}, QStringLiteral("Import configuration from data string"), QStringLiteral("data")),
-      m_optAresLogin({QStringLiteral("ares-login")}, QStringLiteral("AresVPN Client: read id, password and idx as three lines from stdin, store the rent, exit"))
+      m_optAresLogin({QStringLiteral("ares-login")}, QStringLiteral("AresVPN Client: read id, password and idx as three lines from stdin, store the rent, exit")),
+      m_optQmlSmoke ({QStringLiteral("qml-smoke")}, QStringLiteral("AresVPN Client: compile every page in PageEnum, print any QML error, exit 4 if any failed"))
 {
     setDesktopFileName(QStringLiteral(APPLICATION_NAME));
     setQuitOnLastWindowClosed(false);
@@ -197,6 +200,70 @@ void AmneziaApplication::init()
 
     m_coreController->setQmlRoot();
 
+    if (m_parser.isSet(m_optQmlSmoke)) {
+        // AresVPN Client (AresProject ROADMAP 18-3h, #L054). Every page except the start tree is
+        // loaded ON DEMAND, so starting the app - even offscreen - compiles three files and says
+        // nothing about the other sixty-eight. `onAccent` was a COMPILE error in a singleton and
+        // it made the whole UI fail to load; qmllint, a name cross-check and three RC=0 builds all
+        // said green. This walks PageEnum and asks the engine to compile each page, here, where
+        // the context properties the pages bind to already exist.
+        //
+        // COMPILE, not create: instantiating a page would run its bindings and call controllers,
+        // which is a side effect a check must not have (#L023). The class this catches is exactly
+        // the class that bit - unresolved types, illegal property names, bad attached properties.
+        QTextStream out(stdout);
+        const QMetaEnum pages = QMetaEnum::fromType<PageLoader::PageEnum>();
+        int compiled = 0;
+        int failed = 0;
+        QStringList noFile;
+        for (int i = 0; i < pages.keyCount(); ++i) {
+            const QString name = QString::fromLatin1(pages.key(i));
+            const QString path = QStringLiteral(APP_QML_PAGES_PREFIX) + name + QStringLiteral(".qml");
+            QQmlComponent component(m_engine, QUrl(path));
+            if (component.isError()) {
+                // TWO DIFFERENT THINGS, and lumping them would make this check unusable.
+                // "No such file" means upstream has a PageEnum key with no page behind it -
+                // measured 2026-09-04: PageAbout, PageProtocolIKev2Settings and
+                // PageSettingsLanguage, and NO QML in this tree names any of the three, so
+                // nothing can navigate to them. Reported, not failed.
+                // Anything else is a QML error in a page that exists, which is the class this
+                // check was written for (#L054).
+                bool missing = false;
+                const QList<QQmlError> errors = component.errors();
+                for (const QQmlError &e : errors) {
+                    if (e.toString().contains(QStringLiteral("No such file or directory"))) {
+                        missing = true;
+                    }
+                }
+                if (missing) {
+                    noFile.append(name);
+                    continue;
+                }
+                ++failed;
+                out << "QML-SMOKE FAIL " << name << Qt::endl;
+                for (const QQmlError &e : errors) {
+                    out << "    " << e.toString() << Qt::endl;
+                }
+            } else {
+                ++compiled;
+            }
+        }
+        if (!noFile.isEmpty()) {
+            out << "QML-SMOKE " << noFile.size() << " PageEnum key(s) with no page file (upstream's, "
+                << "unreferenced by any QML, so unreachable): " << noFile.join(QStringLiteral(", "))
+                << Qt::endl;
+        }
+        // A floor, because a walk that found no pages would print "0 failed" and look clean
+        // (#L041). PageEnum has dozens of entries; anything under ten is a broken walk.
+        if (pages.keyCount() < 10) {
+            out << "QML-SMOKE BROKEN: PageEnum yielded " << pages.keyCount()
+                << " keys - that is a broken walk, not a clean tree" << Qt::endl;
+            ::exit(3);
+        }
+        out << "QML-SMOKE " << compiled << " page(s) compiled, " << failed << " failed" << Qt::endl;
+        ::exit(failed ? 4 : 0);
+    }
+
     m_coreController->checkForAppUpdates();
 
 #ifdef Q_OS_WIN //TODO
@@ -288,6 +355,7 @@ bool AmneziaApplication::parseCommands()
     m_parser.addOption(m_optConnect);
     m_parser.addOption(m_optImport);
     m_parser.addOption(m_optAresLogin);
+    m_parser.addOption(m_optQmlSmoke);
     
     m_parser.process(*this);
 

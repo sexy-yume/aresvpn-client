@@ -10,6 +10,7 @@
 #include <QMimeData>
 #include <QImage>
 #include <QSet>
+#include <functional>
 #include <QQmlComponent>
 #include <QMetaEnum>
 #include <QQuickItem>
@@ -311,9 +312,11 @@ void AmneziaApplication::init()
             QStringLiteral("PageSettingsConnection"),
             QStringLiteral("PageSettingsApplication"),
             QStringLiteral("PageSettingsAbout"),
+            QStringLiteral("PageSettingsLicenses"),
         };
         int written = 0;
         int blank = 0;
+        int licenceFailures = 0;
         for (const QString &name : wanted) {
             const int value = pages.keyToValue(name.toLatin1().constData());
             if (value < 0) {
@@ -349,9 +352,91 @@ void AmneziaApplication::init()
                 out << "QML-SHOT " << name << " -> " << path << "  " << shot.width() << "x"
                     << shot.height() << ", " << colours.size() << " distinct colours" << Qt::endl;
             }
+
+            // THE LICENCE READER, opened WITHOUT a press (AresProject 18-3d).
+            //
+            // GPL-3 section 5 is only satisfied if a user can actually READ the licence, and the
+            // list screen above proves only that four rows drew. The text is loaded from a Qt
+            // resource with XMLHttpRequest, which either works or silently yields an empty string,
+            // and an empty reader looks exactly like a licence with no text. So this opens the
+            // first document by setting the page's `selected` property - a property write, not a
+            // synthetic click, because the walkthrough's presses are flaky and may not be a gate
+            // (#L056) - and then ASSERTS on the character count that came back.
+            //
+            // The page is found by the objectName StackView actually leaves on it, which is the
+            // source URL; the `objectName: "page:..."` a page sets for itself does not survive the
+            // push (measured - see qmlDriver.cpp::collectPages).
+            if (name == QStringLiteral("PageSettingsLicenses")) {
+                QQuickItem *page = nullptr;
+                std::function<void(QQuickItem *)> findPage = [&](QQuickItem *item) {
+                    if (!item || page) {
+                        return;
+                    }
+                    if (item->isVisible()
+                        && item->objectName() == QStringLiteral("qrc:/ui/qml/Pages2/PageSettingsLicenses.qml")) {
+                        page = item;
+                        return;
+                    }
+                    for (QQuickItem *kid : item->childItems()) {
+                        findPage(kid);
+                    }
+                };
+                findPage(window->contentItem());
+
+                if (!page) {
+                    ++licenceFailures;
+                    out << "QML-SHOT LICENCE FAIL - the licences page is not in the visible tree"
+                        << Qt::endl;
+                } else if (!page->setProperty("selected", 0)) {
+                    ++licenceFailures;
+                    out << "QML-SHOT LICENCE FAIL - the page has no `selected` property to set"
+                        << Qt::endl;
+                } else {
+                    for (int i = 0; i < 12; ++i) {
+                        QCoreApplication::processEvents(QEventLoop::AllEvents, 60);
+                    }
+
+                    QQuickItem *textItem = nullptr;
+                    std::function<void(QQuickItem *)> findText = [&](QQuickItem *item) {
+                        if (!item || textItem) {
+                            return;
+                        }
+                        if (item->objectName() == QStringLiteral("licenses.text")) {
+                            textItem = item;
+                            return;
+                        }
+                        for (QQuickItem *kid : item->childItems()) {
+                            findText(kid);
+                        }
+                    };
+                    findText(page);
+
+                    const QString loaded = textItem ? textItem->property("text").toString() : QString();
+                    // The GPL-3 is 35 823 bytes on disk. The floor is deliberately far below that
+                    // and far ABOVE the ~250-character "could not be read" message the page falls
+                    // back to, so the two outcomes cannot be confused - and it is the fallback,
+                    // not an empty string, that a broken resource produces.
+                    const int floorChars = 10000;
+                    if (loaded.size() < floorChars) {
+                        ++licenceFailures;
+                        out << "QML-SHOT LICENCE FAIL - the GPL-3 reader holds " << loaded.size()
+                            << " character(s), under the " << floorChars << " floor. First 120: "
+                            << loaded.left(120).replace(QLatin1Char('\n'), QLatin1Char(' ')) << Qt::endl;
+                    } else {
+                        const QImage reading = window->grabWindow();
+                        const QString rpath = dir + QStringLiteral("/PageSettingsLicenses-reading.png");
+                        reading.save(rpath);
+                        out << "QML-SHOT LICENCE ok - the GPL-3 reader holds " << loaded.size()
+                            << " characters, opens with \""
+                            << loaded.left(38).replace(QLatin1Char('\n'), QLatin1Char(' ')).trimmed()
+                            << "\" -> " << rpath << Qt::endl;
+                    }
+                }
+            }
         }
-        out << "QML-SHOT " << written << " screen(s) rendered, " << blank << " blank" << Qt::endl;
-        ::exit(blank ? 5 : 0);
+        out << "QML-SHOT " << written << " screen(s) rendered, " << blank << " blank, "
+            << licenceFailures << " licence-reader failure(s)" << Qt::endl;
+        ::exit((blank || licenceFailures) ? 5 : 0);
     }
 
     // HARNESS ONLY, and only under the flags that look at pixels. The offscreen platform loads no

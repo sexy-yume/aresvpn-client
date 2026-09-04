@@ -1,0 +1,23 @@
+<!--
+  AresVPN Client - the licence texts, EMBEDDED (AresProject ROADMAP 18-3d).
+
+  They are already INSTALLED beside the executable (client/CMakeLists.txt), which discharges the
+  duty to reproduce them in a distribution. This file is the other half: GPL-3 section 0's
+  Appropriate Legal Notice must tell the user "how to view a copy of this License", and section 5
+  requires the interactive interface to display it. A path on disk is not that - an installed tree
+  can be moved, and on Android there is no such directory at all - so the texts travel INSIDE the
+  binary and the About screen opens them. Roughly 53 KB, on a 4.8 MB executable.
+
+  The paths are relative to this file's directory (client/), and rcc normalises the `..` away:
+  images.qrc already does exactly this for `../fonts/pt-root-ui_vf.ttf`, which the code then reads
+  as `:/fonts/pt-root-ui_vf.ttf`. The aliases are given explicitly so the resource name is a
+  filename a person would recognise rather than whatever normalisation produces.
+-->
+<RCC>
+    <qresource prefix="/licenses">
+        <file alias="GPL-3.0.txt">../LICENSE</file>
+        <file alias="THIRD_PARTY_LICENSES.md">../THIRD_PARTY_LICENSES.md</file>
+        <file alias="OFL-PT-Root-UI.txt">fonts/OFL-PT-Root-UI.txt</file>
+        <file alias="wintun-prebuilt-binaries-license.txt">../licenses/wintun-prebuilt-binaries-license.txt</file>
+    </qresource>
+</RCC>

@@ -183,3 +183,20 @@ void SystemController::sendTouch(float x, float y)
     AndroidController::instance()->sendTouch(x, y);
 #endif
 }
+
+QString SystemController::readBundledLicence(const QString &path)
+{
+    // See the header for why this is narrow. Two refusals, both silent to the caller and both
+    // logged, because a licence that will not open is a defect the QML surfaces on the screen.
+    if (!path.startsWith(QStringLiteral(":/licenses/")) || path.contains(QStringLiteral(".."))) {
+        qWarning() << "readBundledLicence refused a path outside the licence resources:" << path;
+        return {};
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "readBundledLicence could not open" << path << file.errorString();
+        return {};
+    }
+    return QString::fromUtf8(file.readAll());
+}

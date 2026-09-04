@@ -40,6 +40,7 @@ namespace PageLoader
         PageSettingsApiDevices,
         PageSettingsApiSubscriptionKey,
         PageSettingsKillSwitchExceptions,
+        PageSettingsLicenses,  // AresVPN Client - GPL-3 s5's notice, readable in the app (18-3d)
 
         PageServiceSftpSettings,
         PageServiceTorWebsiteSettings,

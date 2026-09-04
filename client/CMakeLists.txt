@@ -74,6 +74,10 @@ qt6_add_resources(QRC ${QRC}
     ${CMAKE_CURRENT_LIST_DIR}/images/images.qrc
     ${CMAKE_CURRENT_LIST_DIR}/images/flagKit.qrc
     ${CMAKE_CURRENT_LIST_DIR}/client_scripts/clientScripts.qrc
+    # AresVPN Client (18-3d): the licence texts are embedded as well as installed. Installing them
+    # discharges the duty to REPRODUCE them; GPL-3 section 5's Appropriate Legal Notice has to be
+    # displayable BY THE RUNNING PROGRAM, and a path on disk is not that on Android.
+    ${CMAKE_CURRENT_LIST_DIR}/licenses.qrc
     ${CLIENT_QML_QRC_FILE}
     # AresVPN Client: server_scripts/serverScripts.qrc is not embedded - the self-hosted install flow
     # is unreachable (see ServersUiController::hasServerWithWriteAccess); the directory stays for merges.

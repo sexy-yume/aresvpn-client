@@ -77,8 +77,21 @@ QtObject {
         // PT Root UI VF. Only pt-root-ui_vf.ttf is added as an application font. On a real desktop
         // the substitution list picks up Consolas; the design's mono face is a REQUEST, not a
         // guarantee, and saying so here is cheaper than someone measuring it again.
-        readonly property string family: 'PT Root UI'
-        readonly property string mono: 'PT Mono'
+        // THE NAME MUST BE EXACT, and mine was not. The bundled face's family is
+        // **PT Root UI VF** - upstream's own text types all say so - and I wrote 'PT Root UI'.
+        // A family Qt cannot find is not an error: it silently resolves to something else, so
+        // every screen this phase rebuilt has been drawing in a FALLBACK rather than in the
+        // product's own face, on any machine that has other fonts. Found by --font-report, which
+        // prints what the request RESOLVED to rather than what was asked for (#L009: read what
+        // the instrument answers, not what you meant).
+        readonly property string family: 'PT Root UI VF'
+
+        // And there is no PT Mono in this build - only pt-root-ui_vf.ttf is added as an
+        // application font, so asking for it resolved to the fallback too. `monospace` is Qt's
+        // generic fixed family and resolves on Windows and Android alike; the addresses and
+        // expiry dates this product is made of keep their mono setting, and it is a face that
+        // actually exists.
+        readonly property string mono: 'monospace'
     }
 
     property QtObject size: QtObject {

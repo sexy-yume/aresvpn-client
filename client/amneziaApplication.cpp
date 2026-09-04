@@ -354,6 +354,21 @@ void AmneziaApplication::init()
         ::exit(blank ? 5 : 0);
     }
 
+    // HARNESS ONLY, and only under the flags that look at pixels. The offscreen platform loads no
+    // system fonts - measured, one family in the whole process - so every Korean string renders as
+    // tofu and the render checks can say nothing about the market this product ships to first.
+    // Loading a Hangul face from the system directory here lets them say something. It is NOT a
+    // product change: a shipped run never takes this path, and the real fallback is the
+    // substitution list in loadFonts().
+    if (m_parser.isSet(m_optQmlShot) || m_parser.isSet(m_optQmlDrive) || m_parser.isSet(m_optFontReport)) {
+        for (const QString &face : {QStringLiteral("C:/Windows/Fonts/malgun.ttf"),
+                                    QStringLiteral("/usr/share/fonts/truetype/nanum/NanumGothic.ttf")}) {
+            if (QFile::exists(face)) {
+                QFontDatabase::addApplicationFont(face);
+            }
+        }
+    }
+
     if (m_parser.isSet(m_optFontReport)) {
         // MEASURE, do not infer. The screens render every Hangul string as tofu, and I concluded
         // from ONE probe - setting the family straight to 'Malgun Gothic' changed nothing - that
@@ -364,7 +379,7 @@ void AmneziaApplication::init()
         const QStringList families = QFontDatabase::families();
         out << "FONT-REPORT " << families.size() << " family(ies) in the database" << Qt::endl;
 
-        const QStringList wanted = {QStringLiteral("PT Root UI"), QStringLiteral("PT Mono"),
+        const QStringList wanted = {QStringLiteral("PT Root UI VF"), QStringLiteral("PT Root UI"),
                                     QStringLiteral("Malgun Gothic"), QStringLiteral("Segoe UI"),
                                     QStringLiteral("Noto Sans CJK KR"), QStringLiteral("Gulim"),
                                     QStringLiteral("Batang"), QStringLiteral("Dotum")};
@@ -375,8 +390,8 @@ void AmneziaApplication::init()
         // The question that actually matters: given the family the screens ask for, does the font
         // Qt resolves have a glyph for a Hangul syllable? QFontMetrics::inFont answers it.
         const QChar hangul(0xC5F0);  // 연, the first character of "연결" (Connect)
-        for (const QString &name : {QStringLiteral("PT Root UI"), QStringLiteral("PT Mono"),
-                                    QStringLiteral("Malgun Gothic")}) {
+        for (const QString &name : {QStringLiteral("PT Root UI VF"), QStringLiteral("PT Root UI"),
+                                    QStringLiteral("monospace"), QStringLiteral("Malgun Gothic")}) {
             QFont font(name);
             const QFontMetrics metrics(font);
             const QFontInfo info(font);
@@ -411,6 +426,15 @@ void AmneziaApplication::init()
         }
         window->resize(420, 780);
         window->show();
+        // ACTIVATE IT. QWindowSystemInterface routes a synthetic press the way the platform
+        // routes a real one, and the platform delivers to the ACTIVE window - show() does not make
+        // a window active on the offscreen plugin. Every red run failed from the first press
+        // onwards, and an activation that had not happened yet is the shape that produces exactly
+        // that: sometimes it has settled by the time the first click goes, sometimes it has not.
+        window->requestActivate();
+        for (int i = 0; i < 40 && !window->isActive(); ++i) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+        }
 
         QmlDriver drive(window, m_parser.value(m_optQmlDrive));
         // WARM UP PROPERLY. Measured over three consecutive runs: run 1 after a build failed ten
@@ -629,8 +653,12 @@ void AmneziaApplication::loadFonts()
                                     QStringLiteral("Microsoft YaHei"), QStringLiteral("Segoe UI")};
     const QStringList monoFallback = {QStringLiteral("Consolas"), QStringLiteral("D2Coding"),
                                       QStringLiteral("Malgun Gothic"), QStringLiteral("Noto Sans Mono CJK KR")};
-    QFont::insertSubstitutions(QStringLiteral("PT Root UI"), uiFallback);
-    QFont::insertSubstitutions(QStringLiteral("PT Mono"), monoFallback);
+    // Registered for the names the screens ACTUALLY ask for. These were "PT Root UI" and
+    // "PT Mono" - neither of which is a family in this build, so the substitution was firing on
+    // every draw and the bundled face never rendered. The exact family is "PT Root UI VF"
+    // (upstream's own text types say so), and the mono request is Qt's generic `monospace`.
+    QFont::insertSubstitutions(QStringLiteral("PT Root UI VF"), uiFallback);
+    QFont::insertSubstitutions(QStringLiteral("monospace"), monoFallback);
 }
 
 bool AmneziaApplication::parseCommands()

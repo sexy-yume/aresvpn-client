@@ -60,17 +60,23 @@ QtObject {
     // PT Root UI stays, under its OFL duties (#D180). Data - addresses, ports, idx, counters -
     // is set in a mono face, because this product is addresses and expiry dates.
     property QtObject font: QtObject {
-        // PT Root UI and PT Mono carry NO HANGUL, and this product's first market is Korea. The
-        // fallback is registered once in C++ (AmneziaApplication::loadFonts, with
-        // QFont::insertSubstitutions) rather than here, because `font.families` is not assignable
-        // on Text in this Qt - measured: "Cannot assign to non-existent property families", and it
-        // took the whole UI down for one build until --qml-smoke said so.
+        // PT Root UI carries NO HANGUL, and this product's first market is Korea. The fallback is
+        // registered once in C++ (AmneziaApplication::loadFonts, QFont::insertSubstitutions)
+        // rather than here, because `font.families` is not assignable on Text in this Qt -
+        // measured: "Cannot assign to non-existent property families", and it took the whole UI
+        // down for one build until --qml-smoke said so.
         //
-        // STATED HONESTLY: that fallback is UNVERIFIED. The offscreen renderer the screens are
-        // checked with has no access to the system font database - probed by setting this family
-        // to 'Malgun Gothic' directly, which changed nothing - so the harness renders every
-        // Hangul string as tofu whatever we do, and cannot tell a real defect from its own blind
-        // spot. Only running the app on a desktop settles it (AresProject 18-3h).
+        // WHY THE HARNESS CANNOT CHECK IT, measured rather than inferred (--font-report):
+        // the offscreen process sees exactly ONE font family, the bundled PT Root UI VF. Malgun
+        // Gothic, Segoe UI, Noto Sans CJK KR, Gulim, Batang and Dotum are all ABSENT, and every
+        // family name asked for resolves to that one font, which has no Hangul glyph. So every
+        // screenshot renders Korean as tofu whatever the code does, and the render harness can say
+        // nothing about it either way. Only a desktop run settles it.
+        //
+        // AND PT MONO IS NOT BUNDLED EITHER - the same report shows `PT Mono` resolving to
+        // PT Root UI VF. Only pt-root-ui_vf.ttf is added as an application font. On a real desktop
+        // the substitution list picks up Consolas; the design's mono face is a REQUEST, not a
+        // guarantee, and saying so here is cheaper than someone measuring it again.
         readonly property string family: 'PT Root UI'
         readonly property string mono: 'PT Mono'
     }

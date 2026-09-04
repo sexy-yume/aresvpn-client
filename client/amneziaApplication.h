@@ -70,6 +70,7 @@ private:
     QCommandLineOption m_optQmlSmoke;   // AresVPN Client: compile every page and report, then exit
     QCommandLineOption m_optQmlShot;    // AresVPN Client: render named screens to PNG, then exit
     QCommandLineOption m_optQmlDrive;   // AresVPN Client: click through #D182 and report, then exit
+    QCommandLineOption m_optFontReport; // AresVPN Client: what fonts this process can actually see
 
     QSharedPointer<VpnConnection> m_vpnConnection;
     QThread m_vpnConnectionThread;

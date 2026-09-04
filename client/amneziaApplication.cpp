@@ -3,6 +3,8 @@
 #include <QClipboard>
 #include <QTextStream>  // AresVPN Client: --ares-login
 #include <QFontDatabase>
+#include <QFontInfo>
+#include <QFontMetrics>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMimeData>
@@ -53,7 +55,8 @@ AmneziaApplication::AmneziaApplication(int &argc, char *argv[]) : AMNEZIA_BASE_C
       m_optAresLogin({QStringLiteral("ares-login")}, QStringLiteral("AresVPN Client: read id, password and idx as three lines from stdin, store the rent, exit")),
       m_optQmlSmoke ({QStringLiteral("qml-smoke")}, QStringLiteral("AresVPN Client: compile every page in PageEnum, print any QML error, exit 4 if any failed")),
       m_optQmlShot  ({QStringLiteral("qml-shot")}, QStringLiteral("AresVPN Client: navigate to each named page and write a PNG of the window into <dir>, then exit"), QStringLiteral("dir")),
-      m_optQmlDrive ({QStringLiteral("qml-drive")}, QStringLiteral("AresVPN Client: click through the #D182 walkthrough, writing a PNG per step into <dir>, then exit"), QStringLiteral("dir"))
+      m_optQmlDrive ({QStringLiteral("qml-drive")}, QStringLiteral("AresVPN Client: click through the #D182 walkthrough, writing a PNG per step into <dir>, then exit"), QStringLiteral("dir")),
+      m_optFontReport({QStringLiteral("font-report")}, QStringLiteral("AresVPN Client: list the font families this process can see and whether they carry Hangul, then exit"))
 {
     setDesktopFileName(QStringLiteral(APPLICATION_NAME));
     setQuitOnLastWindowClosed(false);
@@ -351,6 +354,39 @@ void AmneziaApplication::init()
         ::exit(blank ? 5 : 0);
     }
 
+    if (m_parser.isSet(m_optFontReport)) {
+        // MEASURE, do not infer. The screens render every Hangul string as tofu, and I concluded
+        // from ONE probe - setting the family straight to 'Malgun Gothic' changed nothing - that
+        // the offscreen platform has no system font database. That is an INFERENCE from a single
+        // observation, which is exactly what #L004 says not to act on. This asks the font database
+        // directly: what families are there, and can the resolved font actually draw Hangul?
+        QTextStream out(stdout);
+        const QStringList families = QFontDatabase::families();
+        out << "FONT-REPORT " << families.size() << " family(ies) in the database" << Qt::endl;
+
+        const QStringList wanted = {QStringLiteral("PT Root UI"), QStringLiteral("PT Mono"),
+                                    QStringLiteral("Malgun Gothic"), QStringLiteral("Segoe UI"),
+                                    QStringLiteral("Noto Sans CJK KR"), QStringLiteral("Gulim"),
+                                    QStringLiteral("Batang"), QStringLiteral("Dotum")};
+        for (const QString &name : wanted) {
+            out << "  " << (families.contains(name) ? "present " : "ABSENT  ") << name << Qt::endl;
+        }
+
+        // The question that actually matters: given the family the screens ask for, does the font
+        // Qt resolves have a glyph for a Hangul syllable? QFontMetrics::inFont answers it.
+        const QChar hangul(0xC5F0);  // 연, the first character of "연결" (Connect)
+        for (const QString &name : {QStringLiteral("PT Root UI"), QStringLiteral("PT Mono"),
+                                    QStringLiteral("Malgun Gothic")}) {
+            QFont font(name);
+            const QFontMetrics metrics(font);
+            const QFontInfo info(font);
+            out << "  " << name << " -> resolved to \"" << info.family() << "\", Hangul glyph: "
+                << (metrics.inFont(hangul) ? "YES" : "no") << Qt::endl;
+        }
+        out << "FONT-REPORT done" << Qt::endl;
+        ::exit(0);
+    }
+
     if (m_parser.isSet(m_optQmlDrive)) {
         // AresVPN Client (AresProject ROADMAP 18-3h). Rendering a screen says it DRAWS; it does
         // not say a customer can get anywhere. This presses the controls, in the real shell, and
@@ -377,7 +413,16 @@ void AmneziaApplication::init()
         window->show();
 
         QmlDriver drive(window, m_parser.value(m_optQmlDrive));
-        drive.settle(20);
+        // WARM UP PROPERLY. Measured over three consecutive runs: run 1 after a build failed ten
+        // steps and runs 2 and 3 were clean. The first run is cold - the QML disk cache is being
+        // written, models are filling, translations loading - and a press sent into that goes
+        // nowhere. A check that fails one run in three teaches a reader to re-run it (#L033), so
+        // the warm-up waits for the app to be quiet rather than for a fixed 500 ms.
+        drive.settle(40);
+        for (int i = 0; i < 20 && drive.currentPage().startsWith(QStringLiteral("(")); ++i) {
+            drive.settle(20);
+        }
+        drive.settle(40);
 
         // Read the controllers through the QML CONTEXT rather than through CoreController's
         // accessors: those are protected, and widening an upstream header for a test hook is a
@@ -407,19 +452,19 @@ void AmneziaApplication::init()
             // customer visits when they want to - never a step on the way to connecting.
             drive.expectPage(QStringLiteral("page:PageHome"));
             drive.expectExists(QStringLiteral("home.connect"));
+            drive.reportTruncated(QStringLiteral("the home screen"));
 
             // FIRST ACTION, deliberately: home.settings is an ImageButtonType, the same control
             // type as the trash button that would not act. Pressing it BEFORE any navigation
             // separates the two models that survived - "this control type never receives a
             // synthetic press" and "nothing acts after a page change" - and one run decides it.
-            drive.click(QStringLiteral("home.settings"));
-            drive.expectPage(QStringLiteral("page:PageSettings"));
+            drive.clickTo(QStringLiteral("home.settings"), QStringLiteral("page:PageSettings"));
             m_coreController->pageController()->goToPageHome();
             drive.settle(20);
             drive.expectPage(QStringLiteral("page:PageHome"));
 
-            drive.click(QStringLiteral("home.rents"));
-            drive.expectPage(QStringLiteral("page:PageAresRents"));
+            drive.clickTo(QStringLiteral("home.rents"), QStringLiteral("page:PageAresRents"));
+            drive.reportTruncated(QStringLiteral("the rent list"));
             drive.shot(QStringLiteral("rents"));
 
             // THE LAST DISCRIMINATOR. Navigation FROM the startup page works every time and
@@ -442,8 +487,8 @@ void AmneziaApplication::init()
                 drive.expectExists(QStringLiteral("rents.trash1"));
             }
 
-            drive.click(QStringLiteral("rents.add"));
-            drive.expectPage(QStringLiteral("page:PageSetupWizardAresLogin"));
+            drive.clickTo(QStringLiteral("rents.add"), QStringLiteral("page:PageSetupWizardAresLogin"));
+            drive.reportTruncated(QStringLiteral("the login"));
             drive.type(QStringLiteral("login.id"), QStringLiteral("driver"));
             drive.type(QStringLiteral("login.idx"), QStringLiteral("odin_1"));
             drive.shot(QStringLiteral("login-typed"));
@@ -457,14 +502,16 @@ void AmneziaApplication::init()
         m_coreController->pageController()->goToPage(PageLoader::PageEnum::PageSettings, false);
         drive.settle(16);
         drive.expectPage(QStringLiteral("page:PageSettings"));
+        drive.reportTruncated(QStringLiteral("Settings"));
         drive.shot(QStringLiteral("settings"));
-        drive.click(QStringLiteral("settings.group1"));
-        drive.expectPage(QStringLiteral("page:PageSettingsConnection"));
+        drive.clickTo(QStringLiteral("settings.group1"), QStringLiteral("page:PageSettingsConnection"));
+        drive.reportTruncated(QStringLiteral("Settings > Connection"));
         drive.shot(QStringLiteral("settings-connection"));
 
         m_coreController->pageController()->goToPage(PageLoader::PageEnum::PageSettingsApplication, false);
         drive.settle(16);
         drive.expectPage(QStringLiteral("page:PageSettingsApplication"));
+        drive.reportTruncated(QStringLiteral("Settings > Application"));
         // flip a switch and put it back, so the run leaves the settings as it found them (#L023)
         const bool before = autoConnectEnabled();
         drive.click(QStringLiteral("app.autoconnect.area"));
@@ -600,6 +647,7 @@ bool AmneziaApplication::parseCommands()
     m_parser.addOption(m_optQmlSmoke);
     m_parser.addOption(m_optQmlShot);
     m_parser.addOption(m_optQmlDrive);
+    m_parser.addOption(m_optFontReport);
     
     m_parser.process(*this);
 

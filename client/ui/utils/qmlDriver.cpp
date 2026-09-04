@@ -159,6 +159,26 @@ static bool waitStable(QQuickWindow *window, QQuickItem *item, QPointF &centreOu
         && centre.x() <= window->width() && centre.y() <= window->height();
 }
 
+// DELIVERED AT THE PLATFORM LEVEL, not by sendEvent. Two earlier versions posted a QMouseEvent
+// straight at the window - first with the short constructor, then with a proper QPointingDevice -
+// and BOTH reported "ok click" while the screen never moved: Qt Quick's delivery agent did not
+// treat them as real presses. QWindowSystemInterface is the same door the platform plugin and
+// QTest use, and it is addressed to THIS WINDOW, so it is still a channel with no shared
+// resource (#L053).
+void QmlDriver::sendClick(const QPointF &centre)
+{
+    const QPointF global = m_window->mapToGlobal(centre);
+    QWindowSystemInterface::handleMouseEvent(m_window, centre, global, Qt::LeftButton,
+                                             Qt::LeftButton, QEvent::MouseButtonPress, Qt::NoModifier);
+    QWindowSystemInterface::flushWindowSystemEvents();
+    // No settle between press and release: a row inside a Flickable claims a press that is HELD
+    // and turns it into a drag, so the click never arrives.
+    QWindowSystemInterface::handleMouseEvent(m_window, centre, global, Qt::NoButton,
+                                             Qt::LeftButton, QEvent::MouseButtonRelease, Qt::NoModifier);
+    QWindowSystemInterface::flushWindowSystemEvents();
+    settle();
+}
+
 bool QmlDriver::click(const QString &objectName)
 {
     QQuickItem *item = find(objectName);
@@ -192,21 +212,7 @@ bool QmlDriver::click(const QString &objectName)
     // reported "ok click home.rents" and the screen never moved, which is a green step over a
     // press that never happened (#L020's cannot-fail half, in a harness). Naming the primary
     // pointing device makes it a real press as far as Quick is concerned.
-    // DELIVERED AT THE PLATFORM LEVEL, not by sendEvent. Two earlier versions posted a
-    // QMouseEvent straight at the window - first with the short constructor, then with a proper
-    // QPointingDevice - and BOTH reported "ok click" while the screen never moved: Qt Quick's
-    // delivery agent did not treat them as real presses. QWindowSystemInterface is the same door
-    // the platform plugin uses and the same one QTest uses, and it is addressed to THIS WINDOW,
-    // so it is still a channel with no shared resource (#L053).
-    QWindowSystemInterface::handleMouseEvent(m_window, centre, global, Qt::LeftButton,
-                                             Qt::LeftButton, QEvent::MouseButtonPress, Qt::NoModifier);
-    QWindowSystemInterface::flushWindowSystemEvents();
-    // No settle between press and release. A row inside a Flickable claims a press that is HELD
-    // and turns it into a drag, so the click never arrives - measured on the Application page,
-    // where the toggle was found, pressed and did not move.
-    QWindowSystemInterface::handleMouseEvent(m_window, centre, global, Qt::NoButton,
-                                             Qt::LeftButton, QEvent::MouseButtonRelease, Qt::NoModifier);
-    QWindowSystemInterface::flushWindowSystemEvents();
+    sendClick(centre);
     settle();
     pass(QStringLiteral("click %1").arg(objectName));
     return true;
@@ -236,10 +242,19 @@ bool QmlDriver::type(const QString &objectName, const QString &text)
 
 bool QmlDriver::expectPage(const QString &pageObjectName)
 {
-    const QString now = currentPage();
-    if (now == pageObjectName) {
-        pass(QStringLiteral("on %1").arg(pageObjectName));
-        return true;
+    // POLL, do not sample. Sampling once made this flaky: a run went fully green, then the same
+    // binary with one extra walk added went 10-red on navigation, because a StackView push takes
+    // a variable time and the assertion was reading a moving system at one instant. A check that
+    // fails one run in three teaches a reader to re-run it (#L033), which is how a real
+    // regression gets waved through - so it waits for the condition instead.
+    QString now;
+    for (int i = 0; i < 40; ++i) {
+        now = currentPage();
+        if (now == pageObjectName) {
+            pass(QStringLiteral("on %1").arg(pageObjectName));
+            return true;
+        }
+        settle(2);
     }
     fail(QStringLiteral("expected %1").arg(pageObjectName), QStringLiteral("the top visible page is %1").arg(now));
     return false;
@@ -247,7 +262,16 @@ bool QmlDriver::expectPage(const QString &pageObjectName)
 
 bool QmlDriver::expectExists(const QString &objectName, bool shouldExist)
 {
-    QQuickItem *hit = find(objectName);
+    // Same rule as expectPage: wait for the condition rather than sampling a moving system. The
+    // WANTED state is what we wait for, so an expectation of absence waits for it to go.
+    QQuickItem *hit = nullptr;
+    for (int i = 0; i < 40; ++i) {
+        hit = find(objectName);
+        if ((hit != nullptr) == shouldExist) {
+            break;
+        }
+        settle(2);
+    }
     const bool there = hit != nullptr;
     if (there && !hit->isEnabled()) {
         QTextStream(stdout) << "       (note: " << objectName
@@ -260,6 +284,80 @@ bool QmlDriver::expectExists(const QString &objectName, bool shouldExist)
     fail(QStringLiteral("%1 should be %2").arg(objectName, shouldExist ? QStringLiteral("there") : QStringLiteral("gone")),
          there ? QStringLiteral("it is present") : QStringLiteral("it is absent"));
     return false;
+}
+
+bool QmlDriver::clickTo(const QString &objectName, const QString &expectedPage)
+{
+    for (int attempt = 1; attempt <= 2; ++attempt) {
+        QQuickItem *item = find(objectName);
+        if (!item) {
+            fail(QStringLiteral("click %1 -> %2").arg(objectName, expectedPage),
+                 QStringLiteral("no visible item with that objectName"));
+            return false;
+        }
+        QPointF centre;
+        if (!waitStable(m_window, item, centre)) {
+            fail(QStringLiteral("click %1 -> %2").arg(objectName, expectedPage),
+                 QStringLiteral("it never came to rest inside the window"));
+            return false;
+        }
+        sendClick(centre);
+        for (int i = 0; i < 40; ++i) {
+            if (currentPage() == expectedPage) {
+                pass(QStringLiteral("click %1 -> %2%3").arg(objectName, expectedPage,
+                     attempt == 1 ? QString() : QStringLiteral(" (second press)")));
+                return true;
+            }
+            settle(2);
+        }
+    }
+    fail(QStringLiteral("click %1 -> %2").arg(objectName, expectedPage),
+         QStringLiteral("two presses and the page is still %1").arg(currentPage()));
+    return false;
+}
+
+int QmlDriver::reportTruncated(const QString &where)
+{
+    settle(8);
+    int cut = 0;
+    int examined = 0;
+    std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+        if (!item || !item->isVisible()) {
+            return;
+        }
+        // Text exposes `truncated` on the meta-object; read it by name so this needs no
+        // QtQuick-private header and works for anything Text-shaped.
+        const QVariant truncated = item->property("truncated");
+        if (truncated.isValid()) {
+            ++examined;
+        }
+        if (truncated.isValid() && truncated.toBool()) {
+            const QString text = item->property("text").toString();
+            ++cut;
+            QTextStream(stdout) << "       CUT on " << where << ": \"" << text.left(60)
+                                << "\" (width " << item->width() << ")" << Qt::endl;
+        }
+        const QList<QQuickItem *> kids = item->childItems();
+        for (QQuickItem *k : kids) {
+            walk(k);
+        }
+    };
+    if (m_window) {
+        walk(m_window->contentItem());
+    }
+    // A FLOOR, because "0 cut off" and "looked at nothing" print the same thing otherwise, and
+    // this project has been fooled by that shape more than once (#L041). A screen with fewer than
+    // three labels is a screen this walk did not really see.
+    if (examined < 3) {
+        fail(QStringLiteral("%1: the truncation walk examined %2 label(s)").arg(where).arg(examined),
+             QStringLiteral("that is a blind walk, not a clean screen"));
+    } else if (cut == 0) {
+        pass(QStringLiteral("none of %1 label(s) is cut off on %2").arg(examined).arg(where));
+    } else {
+        fail(QStringLiteral("%1 has %2 label(s) cut off").arg(where).arg(cut),
+             QStringLiteral("a label the layout truncated is a label a customer cannot read"));
+    }
+    return cut;
 }
 
 void QmlDriver::shot(const QString &tag)

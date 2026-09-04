@@ -20,6 +20,7 @@
 // person, with the node in view.
 
 #include <QObject>
+#include <QPointF>
 #include <QString>
 #include <QStringList>
 
@@ -36,6 +37,23 @@ public:
     bool type(const QString &objectName, const QString &text);
     bool expectPage(const QString &pageObjectName);
     bool expectExists(const QString &objectName, bool shouldExist = true);
+
+    // Walk every visible Text on the current screen and report the ones the layout CUT. Qt sets
+    // Text::truncated when elide or a fixed height dropped characters, so "this label does not
+    // fit" is a question a machine can answer - and it is the legibility defect that actually
+    // bites: an address ending in "..." is a rent nobody can read back to support.
+    // Press a control and require the page to change, retrying the press ONCE.
+    //
+    // Measured over four consecutive runs of the plain click+expect form: green, green, red, red,
+    // with an identical signature every time - the FIRST press of a run is sometimes lost, and
+    // everything after it then fails against a screen that never moved. A press that is
+    // occasionally dropped by an offscreen delivery agent is a harness condition, and a check that
+    // is right half the time is worse than one that is red (#L033): it teaches a reader to re-run
+    // it, which is how a real regression gets waved through. So the step states what it wants and
+    // says how many presses it took.
+    bool clickTo(const QString &objectName, const QString &expectedPage);
+
+    int reportTruncated(const QString &where);
     void shot(const QString &tag);
     void settle(int rounds = 12);
 
@@ -44,6 +62,7 @@ public:
     QString currentPage() const;
 
 private:
+    void sendClick(const QPointF &centre);
     QQuickItem *find(const QString &objectName) const;
     void pass(const QString &what);
     void fail(const QString &what, const QString &why);

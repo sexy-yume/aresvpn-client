@@ -57,7 +57,25 @@ file(COPY ${AMNEZIA_LIBXRAY_PATH} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/androi
 
 find_package(openvpn-pt-android REQUIRED)
 set(LIBS ${LIBS} amnezia::openvpn-pt-android)
-set_property(TARGET ${PROJECT} APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${OPENVPN_PT_ANDROID_LIBCK_OVPN_PLUGIN_PATH})
+# AresVPN Client (AresProject #D192, ROADMAP 18-3e): THE CLOAK PLUGIN IS NOT PACKAGED.
+#
+# `libck-ovpn-plugin.so` is 7 424 088 B of GPL-3 Go inside every APK and **nothing loads it**.
+# Measured here rather than taken from survey 7.5 (#L004): the only references in the whole tree
+# are this line, the recipe target that builds it, and the licence list. Upstream's own MVVM
+# refactor deleted `Cloak.kt` in 847bb692; the one remaining hook,
+# `OpenVpn.kt::configPluggableTransport`, is overridden nowhere; and the C++ side has RETIRED the
+# container - `ContainerUtils::isUnsupportedContainer` returns true for `DockerContainer::Cloak`
+# and `connectionController.cpp` refuses it with `LegacyContainerNotSupportedError`.
+#
+# So this conveys a GPL-3 binary that cannot be reached, which is a Corresponding Source duty taken
+# on for nothing (#D177's rule 3 argument runs the other way here: the cheapest thing to track is
+# the thing you do not ship). The recipe still BUILDS it - not packaging is the whole change, which
+# keeps the conan graph and every package_id identical - and the option is the fork's, defaulting
+# OFF, so upstream's line survives one `if` deep for a cheap merge.
+option(ARES_SHIP_CLOAK_PLUGIN "Package Cloak's OpenVPN plugin (7.4 MB of GPL-3 that nothing loads)" OFF)
+if(ARES_SHIP_CLOAK_PLUGIN)
+    set_property(TARGET ${PROJECT} APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${OPENVPN_PT_ANDROID_LIBCK_OVPN_PLUGIN_PATH})
+endif()
 
 set(APP_ANDROID_PACKAGE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/android)
 

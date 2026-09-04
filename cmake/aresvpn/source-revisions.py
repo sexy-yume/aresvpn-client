@@ -95,6 +95,17 @@ def classify(text):
         branch = re.search(r'"--branch"\s*,\s*[f]?"([^"]+)"', text[m.start():])
         u = url.group(1) if url else "?"
         b = branch.group(1) if branch else "?"
+        # A CHECKOUT OF A FULL COMMIT SHA is the most immutable reference there is, and it is what
+        # a PIN looks like (#D191): `--branch` accepts a branch or a tag and NOT an arbitrary sha,
+        # so pinning a recipe is clone-then-checkout. This is tested BEFORE the branch cases
+        # because a pinned recipe still carries a `git.clone` - reading only the clone reported a
+        # correct pin as UNPINNED, which is a pin looking identical to no pin at all (#L012).
+        # A SHORT sha is deliberately not accepted: it is ambiguous by construction.
+        if re.search(r"git\.checkout\(", text):
+            c = (re.search(r'=\s*"([0-9a-f]{40})"', text)
+                 or re.search(r'checkout\(\s*"([0-9a-f]{40})"', text))
+            if c:
+                return "GIT-COMMIT", f"{u} @ {c.group(1)}"
         # `v{self.version}` and a literal vX.Y are tags; anything else is a branch that moves.
         if b.startswith("v{self.version}") or re.fullmatch(r"v[0-9][0-9.]*", b):
             return "GIT-TAG", f"{u} @ {b}"

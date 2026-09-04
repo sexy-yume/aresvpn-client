@@ -78,6 +78,24 @@ for %%N in (LICENSE THIRD_PARTY_LICENSES.md OFL-PT-Root-UI.txt wintun-prebuilt-b
     if not exist "%STAGE%\%%N" ( echo FAIL: the stage does not carry %%N ^(#D184^) & set "RC=4" )
 )
 if exist "%STAGE%\AresVPNClient.exe" for %%F in ("%STAGE%\AresVPNClient.exe") do echo staged: AresVPNClient.exe %%~zF bytes  %%~tF
+
+:: ORPHANS. `cmake --install` is ADDITIVE - it never deletes a file it has stopped installing - so a
+:: stage accumulates whatever a previous build put there. Measured the day #D192 dropped the Xray
+:: geo databases: both stages still held geoip.dat and geosite.dat, 30 329 347 B of a component the
+:: product no longer ships, and the VM's copy is what a clean-machine test reads. That is #L061's
+:: stale-artefact family - the previous run's output sitting where this run's is expected - and it
+:: is worse in a stage than in a log, because the thing under test loads it.
+::
+:: NAMED, NOT DELETED. Deleting by a list of things we happen to remember dropping is how a stage
+:: loses a file somebody added on purpose; and the install manifest that WOULD make this exact is
+:: `%BUILD_DIR%\install_manifest.txt`, which lists what this build installed. Comparing the stage
+:: against it is the right check and is the next thing to build here.
+for %%N in (geoip.dat geosite.dat) do (
+    if exist "%STAGE%\%%N" (
+        echo NOTE: "%STAGE%\%%N" is an ORPHAN - #D192 stopped shipping it and cmake --install does
+        echo       not delete. Remove it, or a clean-machine test measures a tree we do not ship.
+    )
+)
 if "%RC%"=="0" ( echo STAGE-DONE ) else ( echo STAGE-FAILED RC=%RC% )
 exit /b %RC%
 

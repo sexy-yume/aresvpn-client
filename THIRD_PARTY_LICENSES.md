@@ -40,7 +40,7 @@ these after it).
 | Wintun 0.14.1 (`wintun.dll`, the signed prebuilt) | **Prebuilt Binaries License** (proprietary, non-free) | loaded through its Permitted API only | `licenses/wintun-prebuilt-binaries-license.txt` - redistribution is permitted only beside software that uses the DLL through `wintun.h` (section 3(d)); the Wintun and WireGuard names are not used (3(e)) |
 | tap-windows6 9.27 (`tap0901.sys`, `OemVista.inf`, `tap0901.cat`) | GPL-2.0 | driver installed for OpenVPN | **COPYING not yet read from the source** |
 | `devcon.exe` (Microsoft) | Microsoft terms | driver installation | **terms not yet read** |
-| Mullvad split-tunnel driver 1.2.5 (`mullvad-split-tunnel.sys`) | GPL-3.0 / MPL-2.0 | signed prebuilt | **the exact source revision of the shipped binary is not yet established - required before it is conveyed** |
+| Mullvad split-tunnel driver 1.2.5 (`mullvad-split-tunnel.sys`) | GPL-3.0 / MPL-2.0 | signed prebuilt | **ESTABLISHED 2026-09-04**: the four files are downloaded by the `win-split-tunnel/1.2.5.0` conan recipe from `raw.githubusercontent.com/mullvad/mullvadvpn-app-binaries/ff0e3746c89a04314377cffeb52faaa976413a69/x86_64-pc-windows-msvc/split-tunnel`, each verified by SHA-256 in the recipe - `mullvad-split-tunnel.sys` is `4056b22d08115c1a83bc2cafa17de0bb17db3705eac382de77fd7935eeff7edb`. See `SOURCE-REVISIONS.txt`, generated beside the binary |
 | OpenVPN 2.7.0 (`openvpn.exe`, with lz4 BSD-2 and lzo GPL-2+) | GPL-2.0-only with the OpenSSL, Apache-2 and LZO exceptions | separate process | built from source; "OpenVPN" is a trademark of OpenVPN Inc. |
 | Xray-core via amnezia-xray-bindings 1.4.0 (`amnezia_xray.dll`) | Xray-core MPL-2.0; its `sagernet/sing` and `sing-shadowsocks` modules GPL-3.0-or-later; a GPL-3.0 combined work | loaded by the service | **the wrapper's own licence and the Go module graph not yet read** |
 | tun2socks 2.6.0 (`xjasonlyu/tun2socks`) | MIT | separate process | its Go module graph (gVisor Apache-2.0, golang.org/x BSD-3) ships inside it |
@@ -77,6 +77,16 @@ Not built by this product: Google Play Billing (the `play` flavour), Apple and L
 ## Known gaps in this list
 
 Rows marked "not yet read" are read from the component's own source at its pinned tag before
-the first binary is distributed; the Mullvad driver's source revision and the ML Kit replacement
-are release blockers, not notes. This list is regenerated when a recipe, a Gradle dependency or a
-Qt module changes.
+the first binary is distributed; the ML Kit replacement is a release blocker, not a note. This
+list is regenerated when a recipe, a Gradle dependency or a Qt module changes.
+
+**The source revisions themselves are no longer a list anybody maintains by hand.**
+`cmake/aresvpn/source-revisions.py` reads the conan recipes that produced this build, classifies
+how each conveyed component names its source - tag, release, digest, pinned URL, or a branch that
+MOVES - and writes `SOURCE-REVISIONS.txt` beside the executable. It is run from
+`client/CMakeLists.txt` at configure and, under `-DARES_RELEASE=ON`, a moving reference is fatal
+rather than a sentence in this file. Measured on 2026-09-04: **Windows is clean**; **Android is
+not**, because `openvpn-pt-android` is cloned from the `update-ovpn3` BRANCH, so a conveyed APK
+must record the resolved commit. Two further branch pins exist on the Apple network-extension
+path - `openvpnadapter` (`master-amnezia`) and `hev-socks5-tunnel` - which this product does not
+ship (`#D178`), and they are listed by the tool rather than filtered away.

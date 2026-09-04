@@ -270,6 +270,66 @@ install(FILES
     COMPONENT AresVPNClient
 )
 
+# AresVPN Client (AresProject ROADMAP 18-3d): *compliance as a MECHANISM, not a memory*.
+#
+# GPL-3 section 6 wants the Corresponding Source of every covered component we convey, and a link
+# without a revision does not identify the code the shipped bytes came from. THIRD_PARTY_LICENSES.md
+# carried that gap as a sentence for a human to remember - "the exact source revision of the shipped
+# binary is not yet established" - which is the shape this project keeps paying for.
+#
+# So the manifest is GENERATED from the conan recipes that actually produced this build, installed
+# beside the licence texts, and the generator REFUSES a source reference that moves. It runs here
+# rather than in the preload because conan resolves during the configure above, and it is read
+# rather than assumed: an empty scan is a failure, not a clean bill (#L041).
+#
+# It does not fail an ordinary build. `-DARES_RELEASE=ON` says *this build is intended to be
+# conveyed*, and only then is an unpinned component fatal - an AUTHORISATION rather than a switch,
+# the shape `--allow-dataplane` already uses in this project. As measured on 2026-09-04: Windows is
+# clean; Android is not, because `openvpn-pt-android` is pinned to a BRANCH.
+find_program(_ares_rev_python NAMES python3 python py)
+set(_ares_rev_script "${CMAKE_SOURCE_DIR}/cmake/aresvpn/source-revisions.py")
+set(_ares_rev_out "${CMAKE_BINARY_DIR}/SOURCE-REVISIONS.txt")
+if(ANDROID)
+    set(_ares_rev_os android)
+elseif(WIN32)
+    set(_ares_rev_os windows)
+elseif(APPLE)
+    set(_ares_rev_os apple)
+else()
+    set(_ares_rev_os all)
+endif()
+
+if(_ares_rev_python AND EXISTS "${_ares_rev_script}")
+    execute_process(
+        COMMAND "${_ares_rev_python}" "${_ares_rev_script}" --os "${_ares_rev_os}" --out "${_ares_rev_out}"
+        RESULT_VARIABLE _ares_rev_rc
+        OUTPUT_VARIABLE _ares_rev_out_text
+        ERROR_VARIABLE _ares_rev_err_text
+    )
+    if(NOT _ares_rev_rc EQUAL 0)
+        if(ARES_RELEASE)
+            message(FATAL_ERROR
+                "AresVPN source revisions: a component this ${_ares_rev_os} build conveys has a "
+                "source reference that MOVES, so its Corresponding Source offer would not identify "
+                "the code the binary was built from (GPL-3 s6).\n${_ares_rev_out_text}${_ares_rev_err_text}")
+        else()
+            message(WARNING
+                "AresVPN source revisions: NOT release-clean for ${_ares_rev_os}. This build may not "
+                "be conveyed to anyone. Re-run with -DARES_RELEASE=ON to make this fatal.\n"
+                "${_ares_rev_out_text}${_ares_rev_err_text}")
+        endif()
+    endif()
+    if(EXISTS "${_ares_rev_out}")
+        install(FILES "${_ares_rev_out}"
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            COMPONENT AresVPNClient
+        )
+    endif()
+elseif(ARES_RELEASE)
+    message(FATAL_ERROR "AresVPN source revisions: no python, so the Corresponding Source manifest "
+                        "cannot be produced and this release build must not proceed.")
+endif()
+
 if(APPLE)
     set(RUNTIME_DEPS_DIR ${CMAKE_INSTALL_BINDIR}/AmneziaVPN.app/Contents/Frameworks)
 else()

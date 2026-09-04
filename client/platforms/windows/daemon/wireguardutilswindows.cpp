@@ -114,13 +114,17 @@ bool WireguardUtilsWindows::addInterface(const InterfaceConfig& config) {
   // The preshared key travels in [Peer] now (InterfaceConfig::toWgConf), because that UAPI
   // set used to be the only thing carrying it.
   //
-  // ONE THING THIS CHANGED AND NOBODY HAS READ: the conf handed to the tunnel is no longer
-  // interface-only. `Table = off` above is unchanged, and the pre-fix diagnosis eliminated
-  // the tunnel's OWN built-in firewall on the grounds that an interface-only conf with
-  // `Table = off` takes the doNotRestrict path. Whether that path also depends on the peer
-  // list is UNREAD - amneziawg-windows is a Conan prebuilt here and its source is not in
-  // this tree. It is a candidate for the still-open return direction and it is written down
-  // rather than assumed either way (AresProject ROADMAP 18-3c).
+  // I FLAGGED THIS AS UNREAD AND IT IS NOW READ - the note it replaces was a live question,
+  // and the answer is that adding [Peer] changes nothing about the firewall.
+  // amneziawg-windows tunnel/addressconfig.go::enableFirewall:
+  //
+  //     doNotRestrict := true
+  //     if len(conf.Peers) == 1 && !conf.Interface.TableOff { ... doNotRestrict = false ... }
+  //
+  // `Table = off` above sets TableOff, so the condition is never entered whatever the peer
+  // list holds, and doNotRestrict stays true. The pre-fix elimination of the tunnel's own
+  // firewall therefore never depended on the conf being interface-only, and my worry that the
+  // fix had moved its premise was wrong (AresProject ROADMAP 18-3c).
 
   if (!m_tunnel.start(configString)) {
     logger.error() << "Failed to activate the tunnel service";

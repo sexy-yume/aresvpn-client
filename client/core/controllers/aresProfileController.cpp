@@ -255,6 +255,26 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
         m_serversRepository->addServer(serverId, config, kind);
     }
     result.serverId = serverId;
+
+    // A rent expires; a self-hosted server does not, so nothing upstream carries this. Keep what
+    // the console told us, verbatim, so the UI can say how long is left (#D178's boundary keeps it
+    // out of ServerDescription).
+    if (m_appSettingsRepository) {
+        m_appSettingsRepository->setRentExpiry(serverId, body.value(QStringLiteral("expires_at")).toString());
+    }
+
     emit imported(serverId);
     return result;
+}
+
+QString AresProfileController::rentExpiry(const QString &serverId) const
+{
+    return m_appSettingsRepository ? m_appSettingsRepository->getRentExpiry(serverId) : QString();
+}
+
+void AresProfileController::forgetRentExpiry(const QString &serverId)
+{
+    if (m_appSettingsRepository) {
+        m_appSettingsRepository->forgetRentExpiry(serverId);
+    }
 }

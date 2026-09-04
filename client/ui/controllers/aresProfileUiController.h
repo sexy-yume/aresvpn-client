@@ -28,6 +28,17 @@ public slots:
     QString lastServerId() const { return m_lastServerId; }
     QString endpoint() const;
 
+    // A rent expires - the one fact about our product upstream's server model has no room for.
+    // -1 means "never told" (an imported .conf rather than a login), which the UI shows as nothing
+    // rather than as an expiry of zero.
+    int daysLeftForServer(const QString &serverId) const;
+    QString expiryTextForServer(const QString &serverId) const;
+
+    // Called from the rent list immediately before the rent itself is removed, so the stored
+    // expiry does not outlive the rent it describes. It lives here rather than in
+    // ServersController because that file is upstream's and #D178 keeps its shape.
+    void forgetRentExpiry(const QString &serverId);
+
 signals:
     void loginFinished(const QString &serverId);
     void lastErrorChanged();

@@ -121,6 +121,18 @@ PageType {
                         }
                     }
 
+                    // days left - the rent's own clock, ahead of the selection state, because an
+                    // expired rent is the one thing a customer needs to see without tapping
+                    Text {
+                        property int daysLeft: AresProfileController.daysLeftForServer(serverId)
+                        visible: daysLeft >= 0
+                        text: daysLeft === 0 ? qsTr("EXPIRED") : qsTr("%1 d").arg(daysLeft)
+                        color: daysLeft === 0 ? AresStyle.color.bad
+                                              : (daysLeft <= 7 ? AresStyle.color.warn : AresStyle.color.textMute)
+                        font.family: AresStyle.font.mono
+                        font.pixelSize: AresStyle.size.label
+                    }
+
                     // state pill
                     Rectangle {
                         visible: isDefault
@@ -141,6 +153,25 @@ PageType {
                             font.family: AresStyle.font.mono
                             font.pixelSize: 9
                             font.letterSpacing: 0.8
+                        }
+                    }
+
+                    // remove
+                    ImageButtonType {
+                        image: "qrc:/images/controls/trash.svg"
+                        imageColor: AresStyle.color.textMute
+                        implicitWidth: 28
+                        implicitHeight: 28
+                        onClicked: {
+                            if (ConnectionController.isConnected && isDefault) {
+                                PageController.showNotificationMessage(
+                                    qsTr("Disconnect before removing the rent you are using."))
+                                return
+                            }
+                            removeDialog.pendingIndex = index
+                            removeDialog.pendingName = name
+                            removeDialog.pendingServerId = serverId
+                            removeDialog.open()
                         }
                     }
                 }
@@ -191,6 +222,88 @@ PageType {
             textColor: AresStyle.color.onAccent
 
             clickedFunc: function() { PageController.goToPage(PageEnum.PageSetupWizardAresLogin) }
+        }
+    }
+
+    // Removing a rent is destructive and the credential is not recoverable from this app - it is
+    // re-fetched by logging in again - so it is confirmed, and the confirmation names the rent.
+    Dialog {
+        id: removeDialog
+
+        property int pendingIndex: -1
+        property string pendingName: ""
+        property string pendingServerId: ""
+
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 2 * AresStyle.space.xl, 360)
+        modal: true
+        padding: AresStyle.space.lg
+
+        background: Rectangle {
+            color: AresStyle.color.surfaceHi
+            radius: AresStyle.radius.md
+            border.width: 1
+            border.color: AresStyle.color.lineStrong
+        }
+
+        contentItem: ColumnLayout {
+            spacing: AresStyle.space.md
+
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("Remove %1?").arg(removeDialog.pendingName)
+                color: AresStyle.color.text
+                font.family: AresStyle.font.family
+                font.pixelSize: AresStyle.size.heading
+                font.weight: Font.DemiBold
+                wrapMode: Text.WordWrap
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("The rent itself is not cancelled - only this device forgets it. "
+                         + "Log in with the same idx to get it back.")
+                color: AresStyle.color.textDim
+                font.family: AresStyle.font.family
+                font.pixelSize: AresStyle.size.small
+                wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: AresStyle.space.sm
+                spacing: AresStyle.space.sm
+
+                BasicButtonType {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 44
+                    text: qsTr("Keep")
+                    defaultColor: AresStyle.color.transparent
+                    textColor: AresStyle.color.text
+                    borderWidth: 1
+                    borderColor: AresStyle.color.lineStrong
+                    clickedFunc: function() { removeDialog.close() }
+                }
+
+                BasicButtonType {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 44
+                    text: qsTr("Remove")
+                    defaultColor: AresStyle.color.bad
+                    textColor: AresStyle.color.text
+                    clickedFunc: function() {
+                        if (removeDialog.pendingIndex >= 0) {
+                            // the expiry goes with the rent - the id is unreachable once the
+                            // server row is gone, so this has to happen first
+                            if (removeDialog.pendingServerId !== "") {
+                                AresProfileController.forgetRentExpiry(removeDialog.pendingServerId)
+                            }
+                            ServersUiController.removeServerAtIndex(removeDialog.pendingIndex)
+                        }
+                        removeDialog.close()
+                    }
+                }
+            }
         }
     }
 }

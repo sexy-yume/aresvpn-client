@@ -25,8 +25,10 @@ PageType {
 
         function onGoToPageHome() {
             if (PageController.isStartPageVisible()) {
+                // AresVPN Client (#D182): no rent left - back to the login, the same screen a
+                // first run opens on, rather than upstream's SSH/Premium wizard.
                 tabBar.visible = false
-                tabBarStackView.goToTabBarPage(PageEnum.PageSetupWizardStart)
+                tabBarStackView.goToTabBarPage(PageEnum.PageSetupWizardAresLogin)
             } else {
                 tabBar.visible = true
                 tabBar.setCurrentIndex(0)
@@ -286,8 +288,13 @@ PageType {
         Component.onCompleted: {
             var pagePath
             if (PageController.isStartPageVisible()) {
+                // AresVPN Client (AresProject 18-3h, the operator's requirement): with no rent
+                // stored there is nothing to choose, so the first screen IS the login - not
+                // upstream's wizard, which offers to install a server over SSH or open a Premium
+                // catalogue, neither of which is this product. isStartPageVisible() is exactly
+                // "zero servers stored", so this is the first-run branch.
                 tabBar.visible = false
-                pagePath = PageController.getPagePath(PageEnum.PageSetupWizardStart)
+                pagePath = PageController.getPagePath(PageEnum.PageSetupWizardAresLogin)
             } else {
                 tabBar.visible = true
                 pagePath = PageController.getPagePath(PageEnum.PageHome)

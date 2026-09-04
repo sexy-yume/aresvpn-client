@@ -299,6 +299,30 @@ void SecureAppSettingsRepository::resetAresEndpoint()
     setValue("Conf/aresEndpoint", QString());
 }
 
+// AresVPN Client: the rent expiry map, serverId -> ISO-8601 string, exactly as /api/profile
+// returned it. Kept beside the servers rather than inside a ServerDescription, so core keeps
+// upstream's shape (#D178). An empty return means "we were never told", which the UI shows as
+// nothing rather than as an expiry of zero.
+QString SecureAppSettingsRepository::getRentExpiry(const QString &serverId) const
+{
+    return value("Conf/rentExpiry").toMap().value(serverId).toString();
+}
+
+void SecureAppSettingsRepository::setRentExpiry(const QString &serverId, const QString &expiresAtIso)
+{
+    QVariantMap map = value("Conf/rentExpiry").toMap();
+    map.insert(serverId, expiresAtIso);
+    setValue("Conf/rentExpiry", map);
+}
+
+void SecureAppSettingsRepository::forgetRentExpiry(const QString &serverId)
+{
+    QVariantMap map = value("Conf/rentExpiry").toMap();
+    if (map.remove(serverId) > 0) {
+        setValue("Conf/rentExpiry", map);
+    }
+}
+
 void SecureAppSettingsRepository::resetGatewayEndpoint()
 {
     m_gatewayEndpoint = gatewayEndpoint;

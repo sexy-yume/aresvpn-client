@@ -131,6 +131,39 @@ PageType {
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
             }
+
+            // A rent expires. Nothing upstream has a place for this; for us it is the difference
+            // between a working credential and a dead one, so it is on the first screen.
+            Text {
+                id: expiryLine
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: AresStyle.space.xs
+
+                property int daysLeft: root.hasRent
+                    ? AresProfileController.daysLeftForServer(ServersUiController.defaultServerId)
+                    : -1
+
+                visible: daysLeft >= 0
+                // the sentence comes from the controller so "1 day left" is not "1 days left"
+                // in any of the ten languages the .ts files carry
+                text: root.hasRent
+                    ? AresProfileController.expiryTextForServer(ServersUiController.defaultServerId)
+                    : ""
+                color: daysLeft === 0 ? AresStyle.color.bad
+                                      : (daysLeft <= 7 ? AresStyle.color.warn : AresStyle.color.textMute)
+                font.family: AresStyle.font.mono
+                font.pixelSize: AresStyle.size.label
+                font.letterSpacing: 0.8
+
+                Connections {
+                    target: ServersUiController
+                    function onDefaultServerIdChanged() {
+                        expiryLine.daysLeft = root.hasRent
+                            ? AresProfileController.daysLeftForServer(ServersUiController.defaultServerId)
+                            : -1
+                    }
+                }
+            }
         }
 
         Item { Layout.fillHeight: true }

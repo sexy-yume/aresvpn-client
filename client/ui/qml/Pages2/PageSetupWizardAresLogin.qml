@@ -17,8 +17,16 @@ import "../Controls2/TextTypes"
 PageType {
     id: root
 
+    // #D182: with no rent stored this page IS the first screen, so there is nowhere to go back
+    // to and offering the control would be a dead end. Adding a rent from the list still pushes
+    // this page, and there the back button is real.
+    readonly property bool isFirstRun: PageController.isStartPageVisible()
+
     BackButtonType {
         id: backButton
+
+        visible: !root.isFirstRun
+        height: visible ? implicitHeight : 0
 
         anchors.top: parent.top
         anchors.left: parent.left
@@ -38,6 +46,20 @@ PageType {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
+
+            // On a first run this page is the whole app, so it opens with the mark rather than
+            // looking like step 2 of a wizard (#D182).
+            Image {
+                visible: root.isFirstRun
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 24
+                Layout.bottomMargin: 8
+                Layout.preferredWidth: 64
+                Layout.preferredHeight: 64
+                source: "qrc:/images/controls/amnezia.svg"
+                sourceSize: Qt.size(64, 64)
+                fillMode: Image.PreserveAspectFit
+            }
 
             BaseHeaderType {
                 Layout.fillWidth: true

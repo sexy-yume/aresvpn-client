@@ -69,6 +69,14 @@ public:
     QString getAresEndpoint() const;
     void setAresEndpoint(const QString &endpoint);
     void resetAresEndpoint();
+
+    // AresVPN Client: a rent EXPIRES, which is the one thing about our product that upstream's
+    // server model has no field for. Rather than thread a new column through ServerDescription and
+    // the five buildServerDescription overloads - core shape #D178 says to leave alone - the
+    // expiry is kept beside the servers, keyed by the deterministic server id (`ares-rent-<id>`).
+    QString getRentExpiry(const QString &serverId) const;
+    void setRentExpiry(const QString &serverId, const QString &expiresAtIso);
+    void forgetRentExpiry(const QString &serverId);
     void writeGatewayProxyUrls(const QString &cacheKey, const QByteArray &proxyUrlsEncrypted);
 
     bool isKillSwitchEnabled() const;

@@ -48,6 +48,15 @@ public:
     // duplicates (#D180: add-or-replace by rent_id).
     static QString serverIdForRent(int rentId);
 
+    // What /api/profile said this rent's expiry was, verbatim (ISO-8601), or empty when we were
+    // never told - a config pasted in by hand rather than fetched by a login.
+    QString rentExpiry(const QString &serverId) const;
+
+    // Removing a rent removes its expiry with it. Without this the map grows by one entry per
+    // rent the customer ever held and never shrinks - the harness lesson (#L023) applied to the
+    // product's own storage.
+    void forgetRentExpiry(const QString &serverId);
+
     // Builds the Xray JSON the importer stores for a socks5 rent from its socks5h:// URI. Public
     // so the shape can be checked without a network.
     static QString xrayConfigForSocks5(const QString &uri, QString *errorOut);

@@ -142,6 +142,16 @@ PageType {
 
                 text: qsTr("Add this rent")
 
+                // The accent, like every other primary action in this product. Rendered on the
+                // real platform and looked at (#L055), this was the ONE button that was not:
+                // "Add a rent" on the rent list and "Connect" on the home screen are both accent,
+                // and this one - the primary action of the FIRST screen a customer ever sees
+                // (#D182 rule 1) - was upstream's white.
+                defaultColor: AresStyle.color.accent
+                hoveredColor: AresStyle.color.accentSoft
+                pressedColor: AresStyle.color.accentSoft
+                textColor: AresStyle.color.accentForeground
+
                 clickedFunc: function() { root.doLogin() }
             }
 

@@ -64,6 +64,15 @@ public:
 private:
     void sendClick(const QPointF &centre);
     QQuickItem *find(const QString &objectName) const;
+
+    // Close anything on Qt Quick Controls' popup layer before pressing. See the mechanism in
+    // qmlDriver.cpp beside dismissPopups(): a QQuickOverlay covers the WHOLE window while a Popup
+    // or Drawer is open, the app raises an error notification of its own when no service is
+    // running, and the scene's own hit test at the click point returned <QQuickOverlay> on every
+    // failing run. That is the harness's residual flakiness, measured.
+    // `target` is the objectName about to be pressed: a control that lives INSIDE a popup is
+    // reached by leaving that popup open, so the sweep skips itself.
+    void clearOverlay(const QString &target = QString());
     void pass(const QString &what);
     void fail(const QString &what, const QString &why);
 

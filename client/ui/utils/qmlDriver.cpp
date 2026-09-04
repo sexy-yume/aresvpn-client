@@ -60,6 +60,60 @@ void collectPages(QQuickItem *item, QStringList &out)
     }
 }
 
+
+// THE CAUSE OF THIS HARNESS'S FLAKINESS, MEASURED RATHER THAN GUESSED (AresProject 18-3h).
+//
+// Three theories had been implemented and killed - settle for position, settle for the rendered
+// frame, activate the window - and the third was measured directly: `window active=yes,
+// exposed=yes` on BOTH red runs of a set that went red, green, green, red, green. So instead of a
+// fourth fix, the failure path was made to print what divides the remaining models, and it
+// answered in one line:
+//
+//   diag home.settings: centre=(387,33) size=34x34 enabled=y opacity=1 window=420x780
+//                       hitTest=<QQuickOverlay> < <QQuickRootItem>
+//
+// The scene's OWN hit test at the click point returns **QQuickOverlay**, not the button. That is
+// Qt Quick Controls' popup layer, and it covers the whole window whenever a Popup or Drawer is
+// open. The app opens one on its own: with no service running, it raises an error notification
+// ("ErrorCode: 103" - visible in the render screenshots), and while that is up EVERY press lands
+// on the overlay. Whether it happens to be up during the walk is the whole of the variance, which
+// is why the same binary went green three runs and red two.
+//
+// So the driver closes what is open before it presses. It is not politeness: a customer's click
+// while a modal notification is up does not reach the button either, and a harness that pretends
+// otherwise is measuring a screen nobody is looking at.
+int dismissPopups(QQuickItem *root)
+{
+    if (!root) {
+        return 0;
+    }
+    int closed = 0;
+    std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+        if (!item) {
+            return;
+        }
+        // A Popup is a QObject, not an item; its contentItem's QObject PARENT is the Popup, which
+        // is where close() lives. Asking the item for it is the only route without the private
+        // headers, and it costs nothing when there is no popup.
+        if (QObject *owner = item->parent()) {
+            const QMetaObject *mo = owner->metaObject();
+            if (mo->indexOfMethod("close()") >= 0 && owner->property("opened").toBool()) {
+                QMetaObject::invokeMethod(owner, "close");
+                ++closed;
+            }
+        }
+        for (QQuickItem *kid : item->childItems()) {
+            walk(kid);
+        }
+    };
+    for (QQuickItem *kid : root->childItems()) {
+        if (QString::fromLatin1(kid->metaObject()->className()).contains(QStringLiteral("Overlay"))) {
+            walk(kid);
+        }
+    }
+    return closed;
+}
+
 } // namespace
 
 QmlDriver::QmlDriver(QQuickWindow *window, const QString &shotDir)
@@ -87,6 +141,36 @@ void QmlDriver::settle(int rounds)
 QQuickItem *QmlDriver::find(const QString &objectName) const
 {
     return m_window ? findRecursive(m_window->contentItem(), objectName) : nullptr;
+}
+
+void QmlDriver::clearOverlay(const QString &target)
+{
+    if (!m_window) {
+        return;
+    }
+    // NEVER CLOSE THE POPUP WE ARE ABOUT TO PRESS IN. The first version of this dismissed
+    // everything on the overlay layer before every press, and it made the walkthrough
+    // DETERMINISTIC - six runs of six at exactly 25 steps, 1 failed - with the one failure being
+    // its own: the rent-removal confirmation IS a popup, so the driver closed the dialog it was
+    // about to press Keep in. A harness that removes its own subject is #L023 in miniature, and
+    // the fix is to ask whether the target lives on the overlay before tidying it away.
+    if (!target.isEmpty()) {
+        for (QQuickItem *walk = find(target); walk; walk = walk->parentItem()) {
+            if (QString::fromLatin1(walk->metaObject()->className()).contains(QStringLiteral("Overlay"))) {
+                return;
+            }
+        }
+    }
+    const int closed = dismissPopups(m_window->contentItem());
+    if (closed > 0) {
+        // Said out loud, every time. A harness that silently tidies the screen it is measuring is
+        // changing the world it measures (#L023), and the NUMBER is the evidence that this is the
+        // condition the flakiness came from rather than a plausible story.
+        QTextStream(stdout) << "       (closed " << closed
+                            << " open popup(s) before pressing - they cover the whole window)"
+                            << Qt::endl;
+        settle(6);
+    }
 }
 
 QString QmlDriver::currentPage() const
@@ -181,6 +265,7 @@ void QmlDriver::sendClick(const QPointF &centre)
 
 bool QmlDriver::click(const QString &objectName)
 {
+    clearOverlay(objectName);
     QQuickItem *item = find(objectName);
     if (!item) {
         fail(QStringLiteral("click %1").arg(objectName), QStringLiteral("no visible item with that objectName"));
@@ -289,6 +374,7 @@ bool QmlDriver::expectExists(const QString &objectName, bool shouldExist)
 bool QmlDriver::clickTo(const QString &objectName, const QString &expectedPage)
 {
     for (int attempt = 1; attempt <= 2; ++attempt) {
+        clearOverlay(objectName);
         QQuickItem *item = find(objectName);
         if (!item) {
             fail(QStringLiteral("click %1 -> %2").arg(objectName, expectedPage),
@@ -310,6 +396,40 @@ bool QmlDriver::clickTo(const QString &objectName, const QString &expectedPage)
             }
             settle(2);
         }
+    }
+
+    // A DISCRIMINATING MEASUREMENT RATHER THAN A THIRD FIX (#L010).
+    //
+    // Three theories have now been implemented and killed for this harness's residual flakiness:
+    // wait for the position to settle, wait for the rendered frame, and activate the window. The
+    // last was measured directly - `window active=yes, exposed=yes` on BOTH red runs of a five-run
+    // set that went red, green, green, red, green - so activation is not it either. And the retry
+    // above means TWO consecutive presses were lost, which kills "the first press of a run goes
+    // nowhere" as well.
+    //
+    // So this failure path prints what would divide the remaining models instead of guessing at a
+    // fourth: where the press actually went, whether the item was in a state to receive it, and -
+    // the load-bearing one - what the scene's own hit test finds at that point. If `childAt` names
+    // something ELSE, the press is landing on an overlay and the model is occlusion; if it names
+    // the item and the press still does nothing, the model is delivery. The line costs nothing on
+    // a green run because it is only reached on a red one.
+    if (QQuickItem *item = find(objectName)) {
+        const QPointF centre = item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
+        QQuickItem *hit = m_window ? m_window->contentItem()->childAt(centre.x(), centre.y()) : nullptr;
+        QStringList chain;
+        for (QQuickItem *walk = hit; walk && chain.size() < 6; walk = walk->parentItem()) {
+            chain << (walk->objectName().isEmpty()
+                          ? QStringLiteral("<%1>").arg(QString::fromLatin1(walk->metaObject()->className()))
+                          : walk->objectName());
+        }
+        QTextStream diag(stdout);
+        diag << "       diag " << objectName << ": centre=(" << centre.x() << "," << centre.y()
+             << ") size=" << item->width() << "x" << item->height()
+             << " enabled=" << (item->isEnabled() ? "y" : "n")
+             << " opacity=" << item->opacity()
+             << " window=" << m_window->width() << "x" << m_window->height()
+             << " hitTest=" << (chain.isEmpty() ? QStringLiteral("(nothing)") : chain.join(QStringLiteral(" < ")))
+             << Qt::endl;
     }
     fail(QStringLiteral("click %1 -> %2").arg(objectName, expectedPage),
          QStringLiteral("two presses and the page is still %1").arg(currentPage()));

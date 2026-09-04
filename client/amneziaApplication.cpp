@@ -301,6 +301,30 @@ void AmneziaApplication::init()
             ::exit(3);
         }
         window->resize(420, 780);
+
+        // ON A REAL PLATFORM PLUGIN, THE WINDOW GOES OFF-SCREEN AND TAKES NO FOCUS.
+        //
+        // Everything about this harness is built for `-platform offscreen`, where no window exists
+        // to bother anybody (#L053). But the offscreen platform sees exactly ONE font family - the
+        // bundled PT Root UI VF - so every Korean string renders as tofu whatever the code does,
+        // and the render checks are structurally unable to say anything about the market this
+        // product ships to first. That was measured from both sides (--font-report, and loading
+        // Malgun Gothic by hand) and written down as a limit.
+        //
+        // The `windows` plugin has the system font database AND per-glyph fallback, so running
+        // this same walk on it is the only thing that answers the question. What must NOT happen
+        // is a window appearing on the operator's desktop and taking their focus while they work -
+        // #L053 is about exactly that class of harm, and its remedy is "prefer a channel with no
+        // shared resource". So on any platform other than offscreen the window is moved far
+        // outside every monitor and told not to accept focus: it renders with the real platform's
+        // fonts, grabWindow() still returns its pixels, and the desktop the operator is using is
+        // never touched.
+        if (QGuiApplication::platformName() != QLatin1String("offscreen")) {
+            window->setFlag(Qt::WindowDoesNotAcceptFocus, true);
+            window->setPosition(-32000, -32000);
+            out << "QML-SHOT platform=" << QGuiApplication::platformName()
+                << " - the window is placed off every monitor and refuses focus" << Qt::endl;
+        }
         window->show();
 
         const QMetaEnum pages = QMetaEnum::fromType<PageLoader::PageEnum>();
@@ -517,8 +541,26 @@ void AmneziaApplication::init()
         // onwards, and an activation that had not happened yet is the shape that produces exactly
         // that: sometimes it has settled by the time the first click goes, sometimes it has not.
         window->requestActivate();
-        for (int i = 0; i < 40 && !window->isActive(); ++i) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+        // AND WAIT FOR IT ON A REAL EVENT LOOP, AND SAY WHETHER IT HAPPENED.
+        //
+        // The first version of this wait spun `processEvents` - which is the exact mistake
+        // `QmlDriver::settle()` exists to correct: it drains the queue but does not run the loop
+        // the platform's own delivery and the animation driver are stepped from, so activation
+        // could sit pending for the whole wait. Worse, the loop was SILENT when it gave up: a run
+        // that begins with an inactive window is a run whose first press may go nowhere, and that
+        // is precisely the residual flakiness this harness has (#L056's update: five runs gave
+        // green, red, green, red, green). A harness may not hide the condition that explains its
+        // own variance (#L030: a check that fails for an environmental reason must NAME it).
+        {
+            bool active = window->isActive();
+            for (int i = 0; i < 40 && !active; ++i) {
+                QEventLoop wait;
+                QTimer::singleShot(25, &wait, &QEventLoop::quit);
+                wait.exec();
+                active = window->isActive();
+            }
+            out << "QML-DRIVE window active=" << (active ? "yes" : "NO - presses may not land")
+                << ", exposed=" << (window->isExposed() ? "yes" : "no") << Qt::endl;
         }
 
         QmlDriver drive(window, m_parser.value(m_optQmlDrive));

@@ -199,10 +199,70 @@ def run_report(indir):
     return 0
 
 
-def run_derive(indir, outdir, prefix):
+def merge_overlay(after, overlay_text, name):
+    """Add the fork's OWN strings to a derived .ts.
+
+    AresProject ROADMAP 18-3h. The derivation above rewrites brand names inside translations that
+    ALREADY EXIST; it cannot invent an entry for a string upstream never had, and the screens this
+    phase rebuilt are full of those. Measured on the eight screens we own: **93 unique qsTr strings,
+    22 already Korean, 71 not** - which is why a render on the real Windows platform showed a
+    Korean "설정" beside an English "Rents" on the same screen.
+
+    The merge is deliberately the simplest thing that is correct: a .ts file may carry the same
+    context name more than once and Qt loads every message in the file, so the overlay's <context>
+    blocks are INSERTED before </TS> rather than spliced into the matching context. Nothing
+    upstream wrote is touched, and the two halves stay separable by eye in the output.
+
+    It REFUSES a source that already exists in the derived file with a non-empty translation. That
+    is the one thing that could go wrong silently - an overlay entry quietly shadowing, or being
+    shadowed by, upstream's - and it would look exactly like a working build.
+    """
+    ours = re.findall(r"<context>.*?</context>", overlay_text, re.S)
+    if not ours:
+        raise SystemExit("FATAL: the overlay for %s has no <context> block - it would add nothing, "
+                         "and a silent no-op here ships an untranslated UI (#L041)" % name)
+
+    # A Qt translation is keyed by (CONTEXT, source), not by source alone, and the first version
+    # of this check compared sources across the whole file. It refused four strings whose only
+    # upstream translation lives in a DIFFERENT context - and dropping them from the overlay is
+    # what put an English "Support" on an otherwise Korean About screen. Found by rendering and
+    # looking (#L055); the check was over-strict, which is the rarer half of #L020 and still a
+    # defect, because it silently removed correct work.
+    existing = set()
+    for ctx in re.finditer(r"<context>(.*?)</context>", after, re.S):
+        name = re.search(r"<name>(.*?)</name>", ctx.group(1), re.S)
+        ctxname = name.group(1) if name else ""
+        for m in re.finditer(r"<source>(.*?)</source>\s*<translation(?:\s[^>]*)?>(.*?)</translation>",
+                             ctx.group(1), re.S):
+            if m.group(2).strip():
+                existing.add((ctxname, m.group(1)))
+
+    added = 0
+    clashes = []
+    for block in ours:
+        name = re.search(r"<name>(.*?)</name>", block, re.S)
+        ctxname = name.group(1) if name else ""
+        for m in re.finditer(r"<source>(.*?)</source>", block, re.S):
+            if (ctxname, m.group(1)) in existing:
+                clashes.append(ctxname + " / " + m.group(1))
+            added += 1
+    if clashes:
+        raise SystemExit("FATAL: %d overlay string(s) already carry a translation upstream, so one "
+                         "of the two would silently win: %s"
+                         % (len(clashes), "; ".join(sorted(set(clashes))[:4])))
+
+    marker = "</TS>"
+    assert after.count(marker) == 1, "a .ts with no single </TS> is not a .ts"
+    body = "\n<!-- AresVPN Client: the strings this fork added (cmake/aresvpn/translations). -->\n"
+    body += "\n".join(ours) + "\n"
+    return after.replace(marker, body + marker, 1), added
+
+
+def run_derive(indir, outdir, prefix, overlaydir=None):
     os.makedirs(outdir, exist_ok=True)
     total_changed = 0
     total_unprotected = 0
+    total_added = 0
     files = 0
     protected_kinds = {}
     for name in sorted(os.listdir(indir)):
@@ -225,19 +285,30 @@ def run_derive(indir, outdir, prefix):
         if unprotected:
             print("  %-24s STILL CARRIES THE MARK in %d place(s): %s"
                   % (name, len(unprotected), ", ".join(sorted(set(unprotected))[:6])))
+        # The fork's own strings, if an overlay exists for this locale. Structure is asserted
+        # BEFORE the merge, above, so a broken derivation is never masked by a successful append.
+        added = 0
+        if overlaydir:
+            ov = os.path.join(overlaydir, suffix)
+            if os.path.isfile(ov):
+                after, added = merge_overlay(after, open(ov, encoding="utf-8").read(), name)
+                total_added += added
+
         dest = os.path.join(outdir, prefix + "_" + suffix)
         with open(dest, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(after)
-        print("  %-24s -> %-28s %4d translated string(s) rewritten"
-              % (name, os.path.basename(dest), stats["changed"]))
+        print("  %-24s -> %-28s %4d translated string(s) rewritten%s"
+              % (name, os.path.basename(dest), stats["changed"],
+                 (", %d of ours added" % added) if added else ""))
         total_changed += stats["changed"]
         files += 1
 
     if files == 0:
         raise SystemExit("FATAL: no .ts file in %s - nothing was derived and that is not a pass" % indir)
 
-    print("%d file(s), %d translated string(s) rewritten, %d unprotected brand occurrence(s) left"
-          % (files, total_changed, total_unprotected))
+    print("%d file(s), %d translated string(s) rewritten, %d of the fork's own strings added, "
+          "%d unprotected brand occurrence(s) left"
+          % (files, total_changed, total_added, total_unprotected))
     if protected_kinds:
         print("LEFT ALONE, each for a stated reason:")
         print("  url-or-email          an #L007 input - the operator's real domain settles it")
@@ -350,6 +421,9 @@ def main():
     ap.add_argument("--in", dest="indir")
     ap.add_argument("--out", dest="outdir")
     ap.add_argument("--prefix", default="aresvpnclient")
+    ap.add_argument("--overlay", dest="overlaydir",
+                    help="directory of <locale>.ts files carrying the strings THIS FORK added; "
+                         "each is appended to the derived file for that locale")
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
@@ -362,7 +436,7 @@ def main():
         return run_report(args.indir)
     if not args.indir or not args.outdir:
         raise SystemExit("need --in and --out (or --report / --selftest)")
-    return run_derive(args.indir, args.outdir, args.prefix)
+    return run_derive(args.indir, args.outdir, args.prefix, args.overlaydir)
 
 
 if __name__ == "__main__":

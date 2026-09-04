@@ -3,12 +3,20 @@ import QtQuick.Controls
 
 import Style 1.0
 
+// AresVPN Client (AresProject ROADMAP 18-3h): the tab bar is the ONLY chrome a customer sees on
+// every screen, and it was still Amnezia's - a goldenApricot selected icon over an onyx bar, which
+// is the one warm hue #D183 deliberately kept OUT of this UI so that "connected" and "expiring
+// soon" never compete for a meaning. It was found by rendering on the real windows platform and
+// LOOKING (#L055): every rebuilt screen sat above an orange home icon.
+//
+// This type has exactly one user, PageStart.qml's TabBar, so the tokens can move without touching
+// anything else. Upstream's property names are kept so a merge lands cleanly.
 TabButton {
     id: root
 
-    property string hoveredColor: AmneziaStyle.color.richBrown
-    property string defaultColor: AmneziaStyle.color.paleGray
-    property string selectedColor: AmneziaStyle.color.goldenApricot
+    property string hoveredColor: AresStyle.color.hover
+    property string defaultColor: AresStyle.color.textMute
+    property string selectedColor: AresStyle.color.accent
 
     property string image
 

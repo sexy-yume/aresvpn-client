@@ -45,6 +45,11 @@ set(CLIENT_TS_PREFIX "aresvpnclient" CACHE STRING "Translation filename prefix")
 set(_ares_ts_src "${CMAKE_CURRENT_LIST_DIR}/../../client/translations")
 set(_ares_ts_out "${CMAKE_CURRENT_LIST_DIR}/../../deploy/aresvpn/generated/translations")
 set(_ares_ts_gen "${CMAKE_CURRENT_LIST_DIR}/derive-translations.py")
+# AresVPN Client (18-3h): the derivation rewrites Amnezia's marks inside translations that already
+# exist; it cannot invent an entry for a string upstream never had, and the rebuilt screens are full
+# of those. `cmake/aresvpn/translations/<locale>.ts` carries OUR strings and is appended to the
+# derived file for that locale. Measured before it existed: of 93 unique qsTr strings on the eight
+# screens this fork owns, 22 were Korean and 71 were English - visible on one screen at a time.
 
 find_program(_ares_python NAMES python3 python py)
 if(NOT _ares_python)
@@ -57,6 +62,7 @@ endif()
 
 execute_process(
     COMMAND "${_ares_python}" "${_ares_ts_gen}" --in "${_ares_ts_src}" --out "${_ares_ts_out}"
+            --overlay "${CMAKE_CURRENT_LIST_DIR}/translations"
     RESULT_VARIABLE _ares_ts_rc
     OUTPUT_VARIABLE _ares_ts_out_text
     ERROR_VARIABLE _ares_ts_err_text)

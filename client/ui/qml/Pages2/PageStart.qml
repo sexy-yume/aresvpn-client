@@ -358,9 +358,11 @@ PageType {
                 PathLine { x: 0; y: tabBar.height - 1 }
                 PathLine { x: 0; y: 0 }
 
+                // AresVPN Client (18-3h): the bar itself in our tokens, so the chrome under every
+                // rebuilt screen belongs to the same design as the screen.
                 strokeWidth: 1
-                strokeColor: AmneziaStyle.color.slateGray
-                fillColor: AmneziaStyle.color.onyxBlack
+                strokeColor: AresStyle.color.line
+                fillColor: AresStyle.color.bg
             }
         }
 
@@ -429,7 +431,13 @@ PageType {
             isSelected: tabBar.currentIndex === 3
             image: "qrc:/images/controls/plus.svg"
             clickedFunc: function () {
-                tabBarStackView.goToTabBarPage(PageEnum.PageSetupWizardConfigSource)
+                // AresVPN Client (#D182): "+" means ADD A RENT, and a rent is added by logging in
+                // with id + password + idx. Upstream sent this button to PageSetupWizardConfigSource
+                // - the file / QR / text-key / SSH-install chooser - which is a screen this product
+                // does not use, reachable from the chrome that is visible on EVERY screen. That is
+                // the second rule of #D182 broken by one button, and it survived the whole rebuild
+                // because the tab bar was never looked at.
+                tabBarStackView.goToTabBarPage(PageEnum.PageSetupWizardAresLogin)
                 tabBar.currentIndex = 3
             }
         }

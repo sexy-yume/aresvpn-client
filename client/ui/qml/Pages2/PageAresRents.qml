@@ -80,6 +80,29 @@ PageType {
                 border.width: 1
                 border.color: isDefault ? AresStyle.color.accent : AresStyle.color.line
 
+                // FIRST, so the buttons in the RowLayout below sit ON TOP of it. QML stacks
+                // later siblings above earlier ones, and with this declared last it covered
+                // the whole row including the trash button: pressing delete SELECTED the rent
+                // instead of asking to remove it. Found by clicking it - the screenshot showed
+                // a different rent highlighted and no dialog (AresProject 18-3h).
+                MouseArea {
+                    id: rowArea
+                    objectName: "rents.row" + index
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (ConnectionController.isConnected) {
+                            PageController.showNotificationMessage(
+                                qsTr("Disconnect before switching to another rent."))
+                            return
+                        }
+                        // the UI controller persists the choice; ServersModel's own
+                        // setDefaultServerId is only its internal sync
+                        ServersUiController.setDefaultServerAtIndex(index)
+                    }
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: AresStyle.space.md
@@ -181,23 +204,6 @@ PageType {
                     }
                 }
 
-                MouseArea {
-                    id: rowArea
-                    objectName: "rents.row" + index
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (ConnectionController.isConnected) {
-                            PageController.showNotificationMessage(
-                                qsTr("Disconnect before switching to another rent."))
-                            return
-                        }
-                        // the UI controller persists the choice; ServersModel's own
-                        // setDefaultServerId is only its internal sync
-                        ServersUiController.setDefaultServerAtIndex(index)
-                    }
-                }
             }
         }
 

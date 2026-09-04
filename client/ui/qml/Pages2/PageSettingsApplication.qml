@@ -112,6 +112,7 @@ PageType {
                         if (value !== SettingsController.isScreenshotsEnabled()) {
                             SettingsController.toggleScreenshotsEnabled(value)
                         }
+                        checked = value
                     }
                 }
 
@@ -142,6 +143,11 @@ PageType {
                         if (value !== SettingsController.isAutoConnectEnabled()) {
                             SettingsController.toggleAutoConnect(value)
                         }
+                        // `checked:` above is bound to a FUNCTION CALL, which QML evaluates once
+                        // and never again - so without this the row's own state went stale after
+                        // one press and the switch was ONE-WAY: on, and never off again. Found by
+                        // pressing it twice and reading the setting back (AresProject 18-3h).
+                        checked = value
                     }
                 }
 

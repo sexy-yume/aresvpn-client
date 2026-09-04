@@ -407,9 +407,28 @@ void AmneziaApplication::init()
             // customer visits when they want to - never a step on the way to connecting.
             drive.expectPage(QStringLiteral("page:PageHome"));
             drive.expectExists(QStringLiteral("home.connect"));
+
+            // FIRST ACTION, deliberately: home.settings is an ImageButtonType, the same control
+            // type as the trash button that would not act. Pressing it BEFORE any navigation
+            // separates the two models that survived - "this control type never receives a
+            // synthetic press" and "nothing acts after a page change" - and one run decides it.
+            drive.click(QStringLiteral("home.settings"));
+            drive.expectPage(QStringLiteral("page:PageSettings"));
+            m_coreController->pageController()->goToPageHome();
+            drive.settle(20);
+            drive.expectPage(QStringLiteral("page:PageHome"));
+
             drive.click(QStringLiteral("home.rents"));
             drive.expectPage(QStringLiteral("page:PageAresRents"));
             drive.shot(QStringLiteral("rents"));
+
+            // THE LAST DISCRIMINATOR. Navigation FROM the startup page works every time and
+            // clicks ON a pushed page never do. If PageHome is still VISIBLE while the rent list
+            // is on top, the push has not finished and both pages are live - which is a harness
+            // condition (a transition that no event loop is driving to completion), not a defect
+            // a customer would meet. If PageHome is gone, the push did finish and the dead clicks
+            // are the product's, which is a very different answer.
+            drive.expectExists(QStringLiteral("home.connect"), false);
 
             // The destructive path, as far as the confirmation and no further. The dialog is
             // MODAL, so the run must dismiss it before anything else - the first version did not,

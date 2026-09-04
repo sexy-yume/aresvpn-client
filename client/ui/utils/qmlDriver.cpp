@@ -9,6 +9,7 @@
 #include <QMouseEvent>
 #include <QPointingDevice>
 #include <functional>
+#include <QTimer>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <qpa/qwindowsysteminterface.h>
@@ -69,9 +70,18 @@ QmlDriver::QmlDriver(QQuickWindow *window, const QString &shotDir)
 
 void QmlDriver::settle(int rounds)
 {
-    for (int i = 0; i < rounds; ++i) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 60);
-    }
+    // A REAL EVENT LOOP, not processEvents. This is the fix for the one thing that was actually
+    // wrong, and it took naming the mechanism to see it: under -platform offscreen the StackView's
+    // cross-fade never finished, so the OUTGOING page stayed live and swallowed every press meant
+    // for the incoming one. Measured, not guessed - with the rent list on top, `home.connect` from
+    // the page underneath was still present and clickable.
+    //
+    // processEvents drains the queue; it does not run the loop the animation driver is stepped
+    // from, so a transition can sit half-done for ever. A nested QEventLoop with a timer runs the
+    // real thing, which is what a person's machine does between one click and the next.
+    QEventLoop loop;
+    QTimer::singleShot(rounds * 25, &loop, &QEventLoop::quit);
+    loop.exec();
 }
 
 QQuickItem *QmlDriver::find(const QString &objectName) const
@@ -134,31 +144,15 @@ void QmlDriver::fail(const QString &what, const QString &why)
 // tree was telling the truth about a frame the customer had not been shown yet.
 static bool waitStable(QQuickWindow *window, QQuickItem *item, QPointF &centreOut)
 {
-    // WAIT FOR THE PICTURE TO STOP CHANGING, not for the position to stop changing.
-    //
-    // The first version of this waited on `mapToScene`, and it returned immediately every time -
-    // because a StackView push here CROSS-FADES: position is correct from the first frame and
-    // OPACITY is what animates. The screenshots showed the truth that the object tree hid, two
-    // pages at half opacity over each other, and while that lasts a press goes to whichever of
-    // them is on top rather than to the control under the cursor. Every "clicked and nothing
-    // happened" in this driver was that.
-    //
-    // Comparing consecutive frames covers position, opacity, and whatever animates next. It is
-    // also the same question a person asks before clicking: has the screen settled?
-    QImage last;
-    int steady = 0;
-    for (int i = 0; i < 120; ++i) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
-        const QImage frame = window->grabWindow();
-        if (!last.isNull() && frame == last) {
-            if (++steady >= 2) {
-                break;
-            }
-        } else {
-            steady = 0;
-        }
-        last = frame;
-    }
+    // NO grabWindow() HERE. Two earlier versions waited on the position and then on the rendered
+    // FRAME, and neither changed the result - which by #L010 says the model was wrong, not the
+    // details. The frame version also put a synchronous render inside the click path, which is
+    // its own suspect: a grab on an offscreen window forces a render pass between the caller and
+    // the delivery agent. Waiting is now plain event processing plus a position check, so the
+    // click path does nothing but wait.
+    QEventLoop loop;
+    QTimer::singleShot(700, &loop, &QEventLoop::quit);
+    loop.exec();
     const QPointF centre = item->mapToScene(QPointF(item->width() / 2.0, item->height() / 2.0));
     centreOut = centre;
     return centre.x() >= 0 && centre.y() >= 0
@@ -170,6 +164,18 @@ bool QmlDriver::click(const QString &objectName)
     QQuickItem *item = find(objectName);
     if (!item) {
         fail(QStringLiteral("click %1").arg(objectName), QStringLiteral("no visible item with that objectName"));
+        return false;
+    }
+    // REPORT WHAT THE ITEM ACTUALLY IS. The experiment that got this far showed that clicks on
+    // the STARTUP page work and clicks on any PUSHED page do not, whatever the control type -
+    // home.settings, an ImageButtonType, navigates; rents.trash1, the same type on a pushed page,
+    // does not. The remaining candidate is that a pushed page is visible but not ENABLED, which a
+    // StackView does to anything that is not its currentItem, and which the never-completing
+    // cross-fade would leave in place. So say it, rather than guess again.
+    if (!item->isEnabled()) {
+        fail(QStringLiteral("click %1").arg(objectName),
+             QStringLiteral("the item is VISIBLE but not ENABLED - on a StackView that means the "
+                            "page is not the current item, so no press can reach it"));
         return false;
     }
     QPointF centre;
@@ -241,7 +247,12 @@ bool QmlDriver::expectPage(const QString &pageObjectName)
 
 bool QmlDriver::expectExists(const QString &objectName, bool shouldExist)
 {
-    const bool there = find(objectName) != nullptr;
+    QQuickItem *hit = find(objectName);
+    const bool there = hit != nullptr;
+    if (there && !hit->isEnabled()) {
+        QTextStream(stdout) << "       (note: " << objectName
+                            << " is visible but NOT enabled)" << Qt::endl;
+    }
     if (there == shouldExist) {
         pass(QStringLiteral("%1 is %2").arg(objectName, shouldExist ? QStringLiteral("there") : QStringLiteral("gone")));
         return true;

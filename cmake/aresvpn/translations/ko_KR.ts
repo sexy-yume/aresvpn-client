@@ -375,4 +375,14 @@ The same texts are installed beside the program&apos;s executable, and the compl
         <translation>비밀번호</translation>
     </message>
 </context>
+<context>
+    <name>QObject</name>
+    <!-- errorStrings.cpp uses QObject::tr, so the context is QObject. This is the message a
+         customer meets when a connect fails with no service running - the operator met it
+         themselves, as a bare "ErrorCode: 103". -->
+    <message>
+        <source>The AresVPN background service is not running, so no tunnel can be opened. It is installed with the app and starts with Windows; if you are running a build directly, install it first or start the AresVPNClient-service process.</source>
+        <translation>AresVPN 백그라운드 서비스가 실행 중이 아니어서 터널을 열 수 없습니다. 이 서비스는 앱과 함께 설치되어 Windows 시작 시 실행됩니다. 빌드를 직접 실행 중이라면 먼저 설치하거나 AresVPNClient-service 프로세스를 시작하세요.</translation>
+    </message>
+</context>
 </TS>

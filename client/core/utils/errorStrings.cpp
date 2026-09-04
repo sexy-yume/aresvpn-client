@@ -11,7 +11,19 @@ QString errorString(ErrorCode code) {
     case(ErrorCode::NoError): errorMessage = QObject::tr("No error"); break;
     case(ErrorCode::UnknownError): errorMessage = QObject::tr("Unknown error"); break;
     case(ErrorCode::NotImplementedError): errorMessage = QObject::tr("Function not implemented"); break;
-    case(ErrorCode::AmneziaServiceNotRunning): errorMessage = QObject::tr("Background service is not running"); break;
+    // AresVPN Client: this is the message a customer actually meets when a connection fails,
+    // and "Background service is not running" told them a fact with nothing to do about it.
+    // The operator hit it themselves: connect-on-launch was ON, the setting was stored true,
+    // the handler fired - and the connect died here. It also sat in every render screenshot
+    // for two sessions as "ErrorCode: 103" and was read past every time, and it is the same
+    // modal that made the click harness flaky (#L059). One cause, three symptoms, and none
+    // of them said what to do.
+    case(ErrorCode::AmneziaServiceNotRunning):
+        errorMessage = QObject::tr("The AresVPN background service is not running, so no tunnel "
+                                   "can be opened. It is installed with the app and starts with "
+                                   "Windows; if you are running a build directly, install it "
+                                   "first or start the AresVPNClient-service process.");
+        break;
     case(ErrorCode::NotSupportedOnThisPlatform): errorMessage = QObject::tr("The selected protocol is not supported on the current platform"); break;
 
     // Server errors

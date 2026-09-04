@@ -219,7 +219,7 @@ PageType {
 
             text: qsTr("Add a rent")
             defaultColor: AresStyle.color.accent
-            textColor: AresStyle.color.onAccent
+            textColor: AresStyle.color.accentForeground
 
             clickedFunc: function() { PageController.goToPage(PageEnum.PageSetupWizardAresLogin) }
         }

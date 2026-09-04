@@ -233,7 +233,7 @@ PageType {
                                 : (root.connected ? qsTr("Disconnect") : qsTr("Connect"))
 
                 defaultColor: root.connected ? AresStyle.color.transparent : AresStyle.color.accent
-                textColor: root.connected ? AresStyle.color.text : AresStyle.color.onAccent
+                textColor: root.connected ? AresStyle.color.text : AresStyle.color.accentForeground
                 borderWidth: root.connected ? 1 : 0
                 borderColor: AresStyle.color.lineStrong
 

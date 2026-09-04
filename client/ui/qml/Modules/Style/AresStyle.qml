@@ -19,7 +19,13 @@ QtObject {
 
     // ---- the one decision --------------------------------------------------------------
     readonly property color accent: '#7FC6E8'
-    readonly property color onAccent: '#08090B'
+    // NOT `onAccent`. QML reads any `on<Capital>` identifier as a SIGNAL HANDLER, so
+    // `readonly property color onAccent: ...` is `Cannot assign a value to a signal` -
+    // AresStyle then fails to load, and with it every type that imports it, up to
+    // `main2.qml: Type PageStart unavailable`. The whole UI was blank and nothing said so:
+    // qmllint passed, the name cross-check passed, the build was RC=0. It took loading the
+    // QML in a real Qt engine to see it (AresProject 18-3h).
+    readonly property color accentForeground: '#08090B'
 
     property QtObject color: QtObject {
         readonly property color transparent: 'transparent'
@@ -38,7 +44,7 @@ QtObject {
         readonly property color textMute: '#666E7B'
 
         readonly property color accent: root.accent
-        readonly property color onAccent: root.onAccent
+        readonly property color accentForeground: root.accentForeground
         readonly property color accentSoft: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.14)
 
         // semantic - separate from the accent on purpose, so "connected" and "expiring"

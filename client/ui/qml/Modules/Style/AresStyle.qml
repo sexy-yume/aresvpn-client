@@ -10,10 +10,15 @@ import QtQuick
 // rather than as default grey, and the accent is a DECISION rather than something the brand
 // already made.
 //
-// THE ACCENT IS ONE LINE. The three directions put to the operator (#D071's method):
+// THE ACCENT IS ONE LINE, and it is DECIDED: B, by #D183. The three directions put to the
+// operator under #D071's method were:
 //   A "Instrument"  '#F2F4F7'  - achromatic, state reads from fill and weight alone
-//   B "Signal"      '#7FC6E8'  - one cold accent, spent only on the live tunnel
+//   B "Signal"      '#7FC6E8'  - one cold accent, spent only on the live tunnel  <- ships
 //   C "Ember"       '#D98A4A'  - a warm signal; Ares rather than network
+// B because this screen's job is "is my tunnel up": A makes that a word to read, and C says it in
+// the hue this UI already uses for EXPIRING SOON (warn), which would make "connected" and "about
+// to expire" compete for one meaning. B leaves ok/warn/bad their jobs. The operator overrules it
+// by editing the one line below; accentSoft derives from it and accentForeground is its ink.
 QtObject {
     id: root
 

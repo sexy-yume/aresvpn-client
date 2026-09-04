@@ -4,6 +4,7 @@
 
 #include <QDateTime>
 
+#include "core/utils/containers/containerUtils.h"
 #include "core/utils/errorStrings.h"
 
 AresProfileUiController::AresProfileUiController(AresProfileController *controller, QObject *parent)
@@ -72,4 +73,28 @@ void AresProfileUiController::forgetRentExpiry(const QString &serverId)
     if (m_controller) {
         m_controller->forgetRentExpiry(serverId);
     }
+}
+
+// "WireGuard | 112.168.124.190" -> "112.168.124.190". Upstream builds the collapsed description
+// as "<protocol> | <address>"; the home screen shows the protocol on its own line already, and
+// at display size the address is what gets cut. If the separator is ever absent the whole string
+// is returned unchanged, so a shape change upstream degrades to the old behaviour rather than to
+// an empty screen.
+QString AresProfileUiController::addressOnly(const QString &collapsedDescription) const
+{
+    const int bar = collapsedDescription.lastIndexOf(QStringLiteral(" | "));
+    if (bar < 0) {
+        return collapsedDescription;
+    }
+    return collapsedDescription.mid(bar + 3).trimmed();
+}
+
+// The ServersModel exposes `defaultContainer` as the DockerContainer enum's integer, and a rent
+// row was rendering it as "3". This is the same table the rest of the app names containers from,
+// so a row says WireGuard where the connect screen says WireGuard.
+QString AresProfileUiController::protocolLabel(int container) const
+{
+    const QMap<DockerContainer, QString> names = ContainerUtils::containerHumanNames();
+    const auto it = names.constFind(static_cast<DockerContainer>(container));
+    return it == names.constEnd() ? QString() : it.value();
 }

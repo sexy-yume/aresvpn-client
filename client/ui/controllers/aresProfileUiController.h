@@ -39,6 +39,14 @@ public slots:
     // ServersController because that file is upstream's and #D178 keeps its shape.
     void forgetRentExpiry(const QString &serverId);
 
+    // The two things a rent screen shows and upstream had no accessor for. Found by RENDERING the
+    // screens offscreen and looking at them: the home dial read "WireGuard | 112.168.124..." -
+    // the address, which is the thing the customer bought, elided behind a protocol name that is
+    // already on the line below - and every rent row read "· 3", the container ENUM printed as an
+    // integer. Both are formatting, so both live in the UI controller.
+    QString addressOnly(const QString &collapsedDescription) const;
+    QString protocolLabel(int container) const;
+
 signals:
     void loginFinished(const QString &serverId);
     void lastErrorChanged();

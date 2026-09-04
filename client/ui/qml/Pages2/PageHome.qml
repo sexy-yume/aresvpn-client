@@ -107,8 +107,12 @@ PageType {
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillWidth: true
-                text: root.hasRent ? ServersUiController.defaultServerDescriptionCollapsed
-                                   : qsTr("No rent yet")
+                // the ADDRESS alone. Upstream's collapsed description is "<protocol> | <address>",
+                // and at display size that elided the address - the one thing the customer bought -
+                // behind a protocol name the line below already carries. Seen by rendering it.
+                text: root.hasRent
+                    ? AresProfileController.addressOnly(ServersUiController.defaultServerDescriptionCollapsed)
+                    : qsTr("No rent yet")
                 color: AresStyle.color.text
                 font.family: AresStyle.font.mono
                 font.pixelSize: AresStyle.size.display

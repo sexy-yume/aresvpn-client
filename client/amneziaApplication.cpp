@@ -6,6 +6,8 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMimeData>
+#include <QImage>
+#include <QSet>
 #include <QQmlComponent>
 #include <QMetaEnum>
 #include <QQuickItem>
@@ -48,7 +50,8 @@ AmneziaApplication::AmneziaApplication(int &argc, char *argv[]) : AMNEZIA_BASE_C
       m_optConnect  ({QStringLiteral("connect")}, QStringLiteral("Connect to server by index on startup"), QStringLiteral("index")),
       m_optImport   ({QStringLiteral("import")}, QStringLiteral("Import configuration from data string"), QStringLiteral("data")),
       m_optAresLogin({QStringLiteral("ares-login")}, QStringLiteral("AresVPN Client: read id, password and idx as three lines from stdin, store the rent, exit")),
-      m_optQmlSmoke ({QStringLiteral("qml-smoke")}, QStringLiteral("AresVPN Client: compile every page in PageEnum, print any QML error, exit 4 if any failed"))
+      m_optQmlSmoke ({QStringLiteral("qml-smoke")}, QStringLiteral("AresVPN Client: compile every page in PageEnum, print any QML error, exit 4 if any failed")),
+      m_optQmlShot  ({QStringLiteral("qml-shot")}, QStringLiteral("AresVPN Client: navigate to each named page and write a PNG of the window into <dir>, then exit"), QStringLiteral("dir"))
 {
     setDesktopFileName(QStringLiteral(APPLICATION_NAME));
     setQuitOnLastWindowClosed(false);
@@ -264,6 +267,88 @@ void AmneziaApplication::init()
         ::exit(failed ? 4 : 0);
     }
 
+    if (m_parser.isSet(m_optQmlShot)) {
+        // AresVPN Client (AresProject ROADMAP 18-3h). "It compiles" is not "a customer can use
+        // it": a page whose text is the same colour as its background, whose rows overlap or
+        // whose button is off the bottom edge compiles perfectly. This navigates the REAL shell
+        // to each screen and writes what the renderer produced, so the screens can be LOOKED at
+        // without a window ever appearing on anybody's desktop (#L053).
+        //
+        // Needs -platform offscreen and QT_QUICK_BACKEND=software: the offscreen platform has no
+        // GPU surface, and the software renderer is what makes grabWindow() return pixels rather
+        // than an empty image. The harness sets both; if it did not, the images would be blank
+        // and blank would look like a rendered screen (#L009).
+        QTextStream out(stdout);
+        const QString dir = m_parser.value(m_optQmlShot);
+        QDir().mkpath(dir);
+
+        QQuickWindow *window = nullptr;
+        const QList<QObject *> roots = m_engine->rootObjects();
+        for (QObject *o : roots) {
+            if (auto *w = qobject_cast<QQuickWindow *>(o)) {
+                window = w;
+                break;
+            }
+        }
+        if (!window) {
+            out << "QML-SHOT BROKEN: no QQuickWindow among " << roots.size() << " root object(s)" << Qt::endl;
+            ::exit(3);
+        }
+        window->resize(420, 780);
+        window->show();
+
+        const QMetaEnum pages = QMetaEnum::fromType<PageLoader::PageEnum>();
+        const QStringList wanted = {
+            QStringLiteral("PageHome"),
+            QStringLiteral("PageAresRents"),
+            QStringLiteral("PageSetupWizardAresLogin"),
+            QStringLiteral("PageSettings"),
+            QStringLiteral("PageSettingsConnection"),
+            QStringLiteral("PageSettingsApplication"),
+            QStringLiteral("PageSettingsAbout"),
+        };
+        int written = 0;
+        int blank = 0;
+        for (const QString &name : wanted) {
+            const int value = pages.keyToValue(name.toLatin1().constData());
+            if (value < 0) {
+                out << "QML-SHOT SKIP " << name << " - not a PageEnum key" << Qt::endl;
+                continue;
+            }
+            m_coreController->pageController()->goToPage(static_cast<PageLoader::PageEnum>(value), false);
+            // let the push, the bindings and one frame happen
+            for (int i = 0; i < 12; ++i) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 60);
+            }
+            const QImage shot = window->grabWindow();
+            const QString path = dir + QStringLiteral("/") + name + QStringLiteral(".png");
+            if (shot.isNull() || !shot.save(path)) {
+                out << "QML-SHOT FAIL " << name << " - grab or save failed" << Qt::endl;
+                continue;
+            }
+            // A uniform image is a screen that drew nothing, and it must not read as a success.
+            // Counting distinct colours over a coarse grid is enough to tell "a screen" from
+            // "one flat rectangle" without pretending to judge the design.
+            QSet<QRgb> colours;
+            for (int y = 0; y < shot.height(); y += 7) {
+                for (int x = 0; x < shot.width(); x += 7) {
+                    colours.insert(shot.pixel(x, y));
+                }
+            }
+            if (colours.size() < 4) {
+                ++blank;
+                out << "QML-SHOT BLANK " << name << " - " << colours.size()
+                    << " distinct colour(s); it rendered nothing" << Qt::endl;
+            } else {
+                ++written;
+                out << "QML-SHOT " << name << " -> " << path << "  " << shot.width() << "x"
+                    << shot.height() << ", " << colours.size() << " distinct colours" << Qt::endl;
+            }
+        }
+        out << "QML-SHOT " << written << " screen(s) rendered, " << blank << " blank" << Qt::endl;
+        ::exit(blank ? 5 : 0);
+    }
+
     m_coreController->checkForAppUpdates();
 
 #ifdef Q_OS_WIN //TODO
@@ -342,6 +427,25 @@ void AmneziaApplication::loadFonts()
     QQuickStyle::setStyle("Basic");
 
     QFontDatabase::addApplicationFont(QStringLiteral(APP_UI_FONT_RESOURCE));
+
+    // AresVPN Client (AresProject ROADMAP 18-3h). PT Root UI and PT Mono carry NO HANGUL, and
+    // this product's first market is Korea: rendered offscreen and LOOKED AT, every translated
+    // string on every screen was a row of tofu boxes while the English ones were perfect. No
+    // compiler, linter or name check can see that - it is why the screens are rendered at all.
+    //
+    // Registered here rather than in QML because `font.families` is not assignable on Text in
+    // this Qt ("Cannot assign to non-existent property families" - it took the whole UI down for
+    // one build, and --qml-smoke is what said so). QFont::insertSubstitutions is global, so every
+    // `font.family: 'PT Root UI'` in the tree inherits the fallback from this one place.
+    //
+    // The font is NOT modified and NOT renamed, so PT Root UI's OFL duties are untouched
+    // (#D180 rule 4): a substitution list is a matching hint, not a derivative work.
+    const QStringList uiFallback = {QStringLiteral("Malgun Gothic"), QStringLiteral("Noto Sans CJK KR"),
+                                    QStringLiteral("Microsoft YaHei"), QStringLiteral("Segoe UI")};
+    const QStringList monoFallback = {QStringLiteral("Consolas"), QStringLiteral("D2Coding"),
+                                      QStringLiteral("Malgun Gothic"), QStringLiteral("Noto Sans Mono CJK KR")};
+    QFont::insertSubstitutions(QStringLiteral("PT Root UI"), uiFallback);
+    QFont::insertSubstitutions(QStringLiteral("PT Mono"), monoFallback);
 }
 
 bool AmneziaApplication::parseCommands()
@@ -356,6 +460,7 @@ bool AmneziaApplication::parseCommands()
     m_parser.addOption(m_optImport);
     m_parser.addOption(m_optAresLogin);
     m_parser.addOption(m_optQmlSmoke);
+    m_parser.addOption(m_optQmlShot);
     
     m_parser.process(*this);
 

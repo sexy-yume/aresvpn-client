@@ -111,7 +111,10 @@ PageType {
                             Layout.fillWidth: true
                             text: {
                                 var a = hostName === undefined ? "" : hostName
-                                var p = defaultContainer === undefined ? "" : defaultContainer
+                                // defaultContainer is the DockerContainer ENUM; printed raw it
+                                // read "3" on every row until the screens were rendered and read
+                                var p = defaultContainer === undefined
+                                        ? "" : AresProfileController.protocolLabel(defaultContainer)
                                 return (a !== "" && p !== "") ? a + "  ·  " + p : (a !== "" ? a : p)
                             }
                             color: AresStyle.color.textMute

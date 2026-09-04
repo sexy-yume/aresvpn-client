@@ -202,7 +202,14 @@ dependencies {
     // route and #D187 removed it.
     //
     // A rent arrives by signing in with id + password + idx. There is no configuration to scan.
-    // CameraX goes with it: it is in this build only to feed frames to the scanner.
+    //
+    // CAMERAX STAYS, and taking it out with ML Kit was an over-reach corrected by the build. The
+    // licence condition #D178 names is ML Kit alone - closed-source, not a system library; CameraX
+    // is Apache-2.0 and carries no such problem. And `AmneziaApplication.kt` implements
+    // `CameraXConfig.Provider`, so removing the dependency broke the Kotlin compile of a file that
+    // has nothing to do with the QR feature. Dropping a dependency because it is NEAR the one that
+    // must go is how a fork acquires edits it cannot justify at merge time (#D177 rule 3).
+    implementation(libs.bundles.androidx.camera)
     implementation(libs.androidx.datastore)
     implementation(libs.androidx.biometric)
 

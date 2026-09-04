@@ -18,6 +18,14 @@ set(CPACK_PROJECT_CONFIG_FILE       ${CMAKE_CURRENT_LIST_DIR}/CPackOptions.cmake
 # string instead of the GPL, which is a GPL-3 presentation defect and looks like nothing at all.
 # Copied from the real LICENSE at configure time: one source of truth, a .txt for the installer,
 # and no symlink for a checkout to mangle.
+#
+# WHICH GENERATOR READS THIS, measured by baking an installer rather than by reading CMake's docs
+# (AresProject #D189): CPACK_RESOURCE_FILE_LICENSE is read by the WIX and NSIS generators and is
+# IGNORED BY CPackIFW - which is the DEFAULT generator here. The first IFW package built from this
+# tree therefore had no licence page at all: config/ held only config.xml and controlscript.js, and
+# packages/AresVPNClient/meta/package.xml carried no <Licenses> element. The fix above corrected the
+# CONTENT of a variable the default generator never reads, and only an installer could say so.
+# CPackIFW takes its licence from the component's own LICENSES argument, below.
 configure_file(${CMAKE_SOURCE_DIR}/LICENSE ${CMAKE_BINARY_DIR}/LICENSE.txt COPYONLY)
 set(CPACK_RESOURCE_FILE_LICENSE     ${CMAKE_BINARY_DIR}/LICENSE.txt)
 
@@ -106,6 +114,17 @@ cpack_ifw_configure_component(AresVPNClient
     REQUIRES_ADMIN_RIGHTS
     FORCED_INSTALLATION
     SCRIPT ${CMAKE_SOURCE_DIR}/deploy/installer/qif/componentscript.js
+    # THE LICENCE PAGE THE IFW INSTALLER ACTUALLY SHOWS (AresProject #D189). CPackIFW does not read
+    # CPACK_RESOURCE_FILE_LICENSE - see the note beside it above - so without this argument the
+    # default installer for this product presented no licence at any point. The pair is
+    # <display name> <file>, and the file is the same configure_file copy of the real GPL-3 text,
+    # so there is still one source of truth.
+    #
+    # This is a PRESENTATION duty rather than GPL-3 section 6: the obligation to REPRODUCE the text
+    # is discharged by installing it beside the executable (#D184), and to make it VIEWABLE by the
+    # in-app reader. An installer that asks a customer to accept a licence it never displays is
+    # nonetheless a defect, and the comment above claimed a page that did not exist (#L038).
+    LICENSES "GNU General Public License v3.0" ${CMAKE_BINARY_DIR}/LICENSE.txt
 )
 
 include(CPack)

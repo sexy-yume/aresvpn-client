@@ -150,3 +150,8 @@ DeveloperIdInstallerCertificate.p12
 # AresVPN Client: derived translations. cmake/aresvpn/derive-translations.py rebuilds these on
 # every configure from upstream client/translations/, which is the source and is never edited.
 deploy/aresvpn/generated/
+
+# AresVPN Client: our cmake/ python helpers leave bytecode beside themselves; a `git add -A`
+# after running one committed it once (CLAUDE.md section 5: account for every path).
+__pycache__/
+*.pyc

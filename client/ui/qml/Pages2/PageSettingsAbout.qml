@@ -54,7 +54,7 @@ PageType {
 
             Image {
                 id: image
-                source: "qrc:/images/amneziaBigLogo.png"
+                source: "qrc:/images/aresBigLogo.png"
 
                 Layout.alignment: Qt.AlignCenter
                 Layout.topMargin: 16
@@ -237,7 +237,7 @@ PageType {
 
         readonly property string title: qsTr("Website")
         readonly property string description: qsTr("Visit official website")
-        readonly property string imageSource: "qrc:/images/controls/amnezia.svg"
+        readonly property string imageSource: "qrc:/images/controls/ares.svg"
         readonly property var handler: function() {
             Qt.openUrlExternally(LanguageUiController.getCurrentSiteUrl())
         }

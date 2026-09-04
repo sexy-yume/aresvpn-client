@@ -285,7 +285,7 @@ PageType {
         // product, AresProject #D177 rule 3); it is the AresVPN account login now (18-3c).
         property string title: qsTr("AresVPN account")
         property string description: qsTr("Log in with your id, password and a rent idx")
-        property string imageSource: "qrc:/images/controls/amnezia.svg"
+        property string imageSource: "qrc:/images/controls/ares.svg"
         property bool featuredAmneziaConnection: true
         property bool isVisible: true
         property var handler: function() {

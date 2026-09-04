@@ -146,3 +146,7 @@ macos-with-sign-build.sh
 DeveloperIdApplicationCertificate.p12
 DeveloperIdInstallerCertificate.p12
 
+
+# AresVPN Client: derived translations. cmake/aresvpn/derive-translations.py rebuilds these on
+# every configure from upstream client/translations/, which is the source and is never edited.
+deploy/aresvpn/generated/

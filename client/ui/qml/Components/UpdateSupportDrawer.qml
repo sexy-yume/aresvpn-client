@@ -83,7 +83,7 @@ DrawerType2 {
 
                 text: qsTr("ares-vpn.org")
                 descriptionText: qsTr("Download the update manually")
-                leftImageSource: "qrc:/images/controls/amnezia.svg"
+                leftImageSource: "qrc:/images/controls/ares.svg"
                 rightImageSource: "qrc:/images/controls/chevron-right.svg"
 
                 clickedFunction: function() {

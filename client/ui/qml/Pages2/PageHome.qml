@@ -45,7 +45,7 @@ PageType {
             spacing: AresStyle.space.sm
 
             Image {
-                source: "qrc:/images/controls/amnezia.svg"
+                source: "qrc:/images/controls/ares.svg"
                 sourceSize: Qt.size(22, 22)
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
@@ -83,7 +83,7 @@ PageType {
 
             Image {
                 Layout.alignment: Qt.AlignHCenter
-                source: "qrc:/images/controls/amnezia.svg"
+                source: "qrc:/images/controls/ares.svg"
                 sourceSize: Qt.size(96, 96)
                 Layout.preferredWidth: 96
                 Layout.preferredHeight: 96

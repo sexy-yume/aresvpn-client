@@ -32,7 +32,7 @@ QVariant ContainersModel::data(const QModelIndex &index, int role) const
     switch (role) {
     case NameRole: {
         if (container == DockerContainer::Awg && !isThirdPartyConfig) {
-            return "AmneziaWG Legacy";
+            return "AresWG Legacy";
         }
         return ContainerUtils::containerHumanNames().value(container);
     }

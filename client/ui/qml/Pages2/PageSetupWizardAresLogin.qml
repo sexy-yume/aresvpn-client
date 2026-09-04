@@ -56,7 +56,7 @@ PageType {
                 Layout.bottomMargin: 8
                 Layout.preferredWidth: 64
                 Layout.preferredHeight: 64
-                source: "qrc:/images/controls/amnezia.svg"
+                source: "qrc:/images/controls/ares.svg"
                 sourceSize: Qt.size(64, 64)
                 fillMode: Image.PreserveAspectFit
             }

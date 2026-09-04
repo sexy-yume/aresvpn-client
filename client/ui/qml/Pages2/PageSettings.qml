@@ -1,7 +1,32 @@
+// AresVPN Client - Settings, REBUILT (AresProject ROADMAP 18-3h, #D178, #D182).
+// Copyright (c) 2026 AresVPN. Licensed under the GNU General Public License v3.0 (see LICENSE).
+//
+// Upstream's index had seven entries because upstream's customer administers a server they
+// installed and may hold a Premium subscription. Ours holds RENTS. Three groups are left, and
+// #D182 is the test each one had to pass: does it keep "press Connect and it works" true?
+//
+//   Rents       - the rents on this device. The same screen the home row opens, so there is one
+//                 place a rent is added, switched or removed and not two.
+//   Connection  - what the tunnel does to this machine: kill switch, split tunnelling, DNS.
+//   Application - what the app does to itself: language, autostart, notifications, logging.
+//
+// REMOVED, each because it is dead for this product rather than because it is untidy:
+//   Servers          -> upstream's server list is the SSH/container machinery of a self-hosted
+//                       install. Replaced by Rents, which is the same idea for what we sell.
+//   News & Notifications -> the Premium news feed. Its own `isVisible` is
+//                       `ServersUiController.hasServersFromGatewayApi`, which is false for every
+//                       rent this client can hold, so it was already invisible - it comes out of
+//                       the list so nobody has to work that out again.
+//   Backup           -> exports and re-imports every stored server. A rent is re-fetched with id +
+//                       password + idx, which is simpler and cannot restore a config from a file
+//                       nobody checked (the hazard #D180 rule 2 names for `vpn://` links).
+//
+// KEPT deliberately: About, which carries the Appropriate Legal Notice GPL-3 section 5 requires and
+// 18-3d makes a release gate - it is not a group and it is not optional. Dev console stays behind
+// SettingsController.isDevModeEnabled, exactly as upstream has it.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 
 import PageEnum 1.0
 import Style 1.0
@@ -14,182 +39,183 @@ import "../Config"
 PageType {
     id: root
 
-    Connections {
-        target: ApiNewsController
-        function onFetchNewsFinished() {
-            PageController.showBusyIndicator(false)
-        }
-        
-        function onErrorOccurred(errorCode, showError) {
-            if (showError) {
-                PageController.showErrorMessage(errorCode)
-                PageController.closePage()
-                PageController.showBusyIndicator(false)
-            }
-        }
+    Rectangle {
+        anchors.fill: parent
+        color: AresStyle.color.bg
     }
 
-    ListViewType {
-        id: listView
-
+    ColumnLayout {
         anchors.fill: parent
+        anchors.topMargin: PageController.safeAreaTopMargin
+        spacing: 0
 
-        header: ColumnLayout {
-            width: listView.width
+        BackButtonType {
+            id: backButton
+            Layout.fillWidth: true
+            Layout.topMargin: AresStyle.space.lg
+        }
 
-            BaseHeaderType {
-                id: header
-                Layout.fillWidth: true
-                Layout.topMargin: 24 + PageController.safeAreaTopMargin
-                Layout.bottomMargin: 16
-                Layout.rightMargin: 16
-                Layout.leftMargin: 16
+        Text {
+            Layout.fillWidth: true
+            Layout.leftMargin: AresStyle.space.lg
+            Layout.rightMargin: AresStyle.space.lg
+            Layout.topMargin: AresStyle.space.sm
+            Layout.bottomMargin: AresStyle.space.lg
+            text: qsTr("Settings")
+            color: AresStyle.color.text
+            font.family: AresStyle.font.family
+            font.pixelSize: AresStyle.size.title
+            font.weight: Font.DemiBold
+        }
 
-                headerText: qsTr("Settings")
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: AresStyle.space.lg
+            Layout.rightMargin: AresStyle.space.lg
+            spacing: AresStyle.space.sm
+
+            Repeater {
+                model: root.groups
+
+                delegate: Rectangle {
+                    required property var modelData
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 60
+                    radius: AresStyle.radius.sm
+                    color: rowArea.containsMouse ? AresStyle.color.surfaceHi : AresStyle.color.surface
+                    border.width: 1
+                    border.color: AresStyle.color.line
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: AresStyle.space.lg
+                        anchors.rightMargin: AresStyle.space.lg
+                        spacing: AresStyle.space.md
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: modelData.title
+                                color: AresStyle.color.text
+                                font.family: AresStyle.font.family
+                                font.pixelSize: AresStyle.size.body
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: modelData.subtitle
+                                color: AresStyle.color.textMute
+                                font.family: AresStyle.font.family
+                                font.pixelSize: AresStyle.size.label
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Text {
+                            text: "›"
+                            color: AresStyle.color.textDim
+                            font.pixelSize: AresStyle.size.title
+                        }
+                    }
+
+                    MouseArea {
+                        id: rowArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: PageController.goToPage(modelData.page)
+                    }
+                }
             }
         }
 
-        model: settingsEntries
+        Item { Layout.fillHeight: true }
 
-        delegate: ColumnLayout {
-            width: listView.width
-
-            spacing: 0
-
-            LabelWithButtonType {
-                Layout.fillWidth: true
-
-                visible: isVisible
-
-                text: title
-                rightImageSource: "qrc:/images/controls/chevron-right.svg"
-                leftImageSource: leftImagePath
-
-                clickedFunction: clickedHandler
-            }
-
-            DividerType {
-                visible: isVisible
-            }
+        // The version is here rather than buried in About, because it is the first thing an
+        // operator asks a customer for and the last thing a customer wants to go looking for.
+        Text {
+            Layout.fillWidth: true
+            Layout.leftMargin: AresStyle.space.lg
+            Layout.rightMargin: AresStyle.space.lg
+            text: SettingsController.getAppVersion()
+            color: AresStyle.color.textMute
+            font.family: AresStyle.font.mono
+            font.pixelSize: AresStyle.size.label
+            horizontalAlignment: Text.AlignHCenter
         }
 
-        footer: ColumnLayout {
-            width: listView.width
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: AresStyle.space.lg
+            Layout.rightMargin: AresStyle.space.lg
+            Layout.topMargin: AresStyle.space.sm
+            Layout.bottomMargin: AresStyle.space.xl + PageController.safeAreaBottomMargin
+            spacing: AresStyle.space.md
 
-            LabelWithButtonType {
-                id: close
-
-                visible: GC.isDesktop()
-                Layout.fillWidth: true
-
-                text: qsTr("Close application")
-                leftImageSource: "qrc:/images/controls/x-circle.svg"
-                isLeftImageHoverEnabled: false
-
-                clickedFunction: function() {
-                    PageController.closeApplication()
+            // GPL-3 section 5's Appropriate Legal Notice lives behind this, and 18-3d makes it a
+            // release gate. It is a link rather than a group on purpose.
+            Text {
+                text: qsTr("About")
+                color: AresStyle.color.textDim
+                font.family: AresStyle.font.family
+                font.pixelSize: AresStyle.size.small
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: PageController.goToPage(PageEnum.PageSettingsAbout)
                 }
             }
 
-            DividerType {
-                Layout.fillWidth: true
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
+            Text {
+                visible: SettingsController.isDevModeEnabled
+                text: qsTr("Dev console")
+                color: AresStyle.color.textDim
+                font.family: AresStyle.font.family
+                font.pixelSize: AresStyle.size.small
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: PageController.goToPage(PageEnum.PageDevMenu)
+                }
+            }
 
+            Item { Layout.fillWidth: true }
+
+            Text {
                 visible: GC.isDesktop()
+                text: qsTr("Close application")
+                color: AresStyle.color.textMute
+                font.family: AresStyle.font.family
+                font.pixelSize: AresStyle.size.small
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: PageController.closeApplication()
+                }
             }
         }
     }
 
-    property list<QtObject> settingsEntries: [
-        servers,
-        connection,
-        application,
-        news,
-        backup,
-        about,
-        devConsole
+    readonly property var groups: [
+        {
+            title: qsTr("Rents"),
+            subtitle: qsTr("Add, switch or remove a rent"),
+            page: PageEnum.PageAresRents
+        },
+        {
+            title: qsTr("Connection"),
+            subtitle: qsTr("Kill switch, split tunnelling and DNS"),
+            page: PageEnum.PageSettingsConnection
+        },
+        {
+            title: qsTr("Application"),
+            subtitle: qsTr("Language, autostart, notifications and logging"),
+            page: PageEnum.PageSettingsApplication
+        }
     ]
-
-    QtObject {
-        id: servers
-
-        property string title: qsTr("Servers")
-        readonly property string leftImagePath: "qrc:/images/controls/server.svg"
-        property bool isVisible: true
-        readonly property var clickedHandler: function() {
-            PageController.goToPage(PageEnum.PageSettingsServersList)
-        }
-    }
-
-    QtObject {
-        id: connection
-
-        property string title: qsTr("Connection")
-        readonly property string leftImagePath: "qrc:/images/controls/radio.svg"
-        property bool isVisible: true
-        readonly property var clickedHandler: function() {
-            PageController.goToPage(PageEnum.PageSettingsConnection)
-        }
-    }
-
-    QtObject {
-        id: application
-
-        property string title: qsTr("Application")
-        readonly property string leftImagePath: "qrc:/images/controls/app.svg"
-        property bool isVisible: true
-        readonly property var clickedHandler: function() {
-            PageController.goToPage(PageEnum.PageSettingsApplication)
-        }
-    }
-
-    QtObject {
-        id: news
-
-        property string title: qsTr("News & Notifications")
-        readonly property string leftImagePath: NewsModel.hasUnread && SettingsController.isNewsNotificationsEnabled() ? "qrc:/images/controls/news-unread.svg" : "qrc:/images/controls/news.svg"
-        property bool isVisible: ServersUiController.hasServersFromGatewayApi
-        readonly property var clickedHandler: function() {
-            if (!ServersUiController.hasServersFromGatewayApi) {
-                return;
-            }
-            PageController.showBusyIndicator(true)
-            ApiNewsController.fetchNews(true)
-            PageController.goToPage(PageEnum.PageSettingsNewsNotifications)
-        }
-    }
-
-    QtObject {
-        id: backup
-
-        property string title: qsTr("Backup")
-        readonly property string leftImagePath: "qrc:/images/controls/save.svg"
-        property bool isVisible: true
-        readonly property var clickedHandler: function() {
-            PageController.goToPage(PageEnum.PageSettingsBackup)
-        }
-    }
-
-    QtObject {
-        id: about
-
-        property string title: qsTr("About AresVPN Client")
-        readonly property string leftImagePath: "qrc:/images/controls/amnezia.svg"
-        property bool isVisible: true
-        readonly property var clickedHandler: function() {
-            PageController.goToPage(PageEnum.PageSettingsAbout)
-        }
-    }
-
-    QtObject {
-        id: devConsole
-
-        property string title: qsTr("Dev console")
-        readonly property string leftImagePath: "qrc:/images/controls/bug.svg"
-        property bool isVisible: SettingsController.isDevModeEnabled
-        readonly property var clickedHandler: function() {
-            PageController.goToPage(PageEnum.PageDevMenu)
-        }
-    }
 }

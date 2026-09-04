@@ -195,6 +195,15 @@ PageType {
             SwitcherType {
                 id: switcherAutoUpdateCheck
 
+                // AresVPN Client: hidden, not deleted. CoreController::checkForUpdates() returns
+                // unconditionally in this fork (18-3e) - the in-app updater is Amnezia's gateway
+                // against a compiled-in key we do not carry - so this switch changed a setting
+                // nothing reads. A control that does nothing is worse than an absent one: the
+                // customer who turns it on believes they will be told about a new version.
+                // The row comes back with the AresVPN update channel (18-3d), which is why the
+                // switch and its setting stay in the tree.
+                visible: false
+
                 Layout.fillWidth: true
                 Layout.margins: 16
 
@@ -210,7 +219,9 @@ PageType {
             }
 
             DividerType {
-                visible: !GC.isMobile()
+                // paired with switcherAutoUpdateCheck above, which this fork hides - a divider
+                // under nothing is how a hidden row still leaves a mark on the screen
+                visible: false
             }
         }
 

@@ -362,7 +362,24 @@ find_package(tun2socks REQUIRED)
 list(APPEND CONAN_EXECS $<TARGET_FILE:xjasonlyu::tun2socks>)
 
 find_package(v2ray-rules-dat REQUIRED)
-list(APPEND CONAN_BINS ${GEOSITE_DAT_PATH} ${GEOIP_DAT_PATH})
+# AresVPN Client (AresProject #D192, ROADMAP 18-3e): THE GEO DATABASES ARE NOT SHIPPED.
+#
+# `geoip.dat` (19 844 054 B) and `geosite.dat` (10 485 293 B) are 30 329 347 B together - **27% of
+# the Windows installer** (#D189 measured it at 113 625 828 B with them in). Xray reads them only
+# when a routing rule names `geoip:` or `geosite:`, and nothing in this product ever writes one:
+# re-measured rather than inherited from survey 5.5 (#L004), `git grep -i "geoip|geosite"` outside
+# the recipes and the licence list returns exactly this line, `client/core` builds no routing block,
+# and our own server's config generator (`server/src/ops.ts`) emits no geo rule either. A customer
+# in Korea or China downloads 30 MB of data no code path can ask for.
+#
+# `find_package` STAYS so conan still resolves the package and the build is unchanged; only the
+# INSTALL list loses them. The option is the fork's and defaults OFF, which is the merge-surviving
+# shape (#D177 rule 3): upstream's own line is still here, one `if` deep, so a merge sees two lines
+# of context rather than a deletion to reconcile. Turn it on if a routing rule is ever added.
+option(ARES_SHIP_GEO_DATA "Ship Xray's geoip.dat/geosite.dat (30 MB; nothing in this product reads them)" OFF)
+if(ARES_SHIP_GEO_DATA)
+    list(APPEND CONAN_BINS ${GEOSITE_DAT_PATH} ${GEOIP_DAT_PATH})
+endif()
 
 add_custom_command(TARGET ${PROJECT} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

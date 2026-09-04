@@ -52,6 +52,23 @@ public slots:
 
 private:
     static bool m_forceQuit;
+
+public:
+    // AresVPN Client - IS THIS PROCESS A MEASUREMENT RATHER THAN THE PRODUCT?
+    //
+    // It decides two things that must agree, and until now nothing decided them together:
+    //   * main.cpp skips the single-instance guard, so a measurement can run beside the client the
+    //     operator is using (measured: it could not, and it died printing NOTHING to stdout);
+    //   * CoreSignalHandlers::initAutoConnectHandler() does NOT arm the auto-connect timer.
+    //
+    // THE SECOND ONE IS A SAFETY FIX ON MY OWN HARNESS. `--qml-drive` says in its own header that
+    // Connect is never pressed, because an unattended tunnel with a kill switch has cost this
+    // project the operator's internet once - and all the while the auto-connect handler was
+    // starting a connection a second after every harness process launched, underneath the UI the
+    // driver was carefully not touching. It only ever failed because the daemon service is not
+    // running on this workstation (ErrorCode 103, AmneziaServiceNotRunning), which is luck, not
+    // design. A process whose job is to measure a build must not bring up a tunnel.
+    static bool isHarnessMode();
     QQmlApplicationEngine *m_engine {};
     SecureQSettings* m_settings;
 

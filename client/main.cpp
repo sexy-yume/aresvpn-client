@@ -74,11 +74,7 @@ int main(int argc, char *argv[])
     //
     // A harness mode also does not call startLocalServer(): claiming that name would make the
     // running client think a second instance had appeared.
-    const bool aresHarnessMode = app.arguments().contains(QStringLiteral("--qml-smoke"))
-            || app.arguments().contains(QStringLiteral("--qml-shot"))
-            || app.arguments().contains(QStringLiteral("--qml-drive"))
-            || app.arguments().contains(QStringLiteral("--font-report"));
-    if (!aresHarnessMode) {
+    if (!AmneziaApplication::isHarnessMode()) {
         if (isAnotherInstanceRunning()) {
             QTimer::singleShot(1000, &app, [&]() { app.quit(); });
             return app.exec();

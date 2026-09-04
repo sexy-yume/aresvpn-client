@@ -1,5 +1,7 @@
 #include "coreSignalHandlers.h"
 
+#include "amneziaApplication.h"
+
 #include <QTimer>
 #include <QtConcurrent>
 
@@ -245,10 +247,32 @@ void CoreSignalHandlers::initLanguageHandler()
 
 void CoreSignalHandlers::initAutoConnectHandler()
 {
-    if (m_coreController->m_settingsUiController->isAutoConnectEnabled()
-        && !m_coreController->m_serversController->getDefaultServerId().isEmpty()) {
-        QTimer::singleShot(1000, this, [this]() { m_coreController->m_connectionUiController->toggleConnection(); });
+    // A HARNESS PROCESS DOES NOT BRING UP A TUNNEL. See AmneziaApplication::isHarnessMode().
+    if (AmneziaApplication::isHarnessMode()) {
+        qDebug() << "auto-connect: skipped, this is a harness run";
+        return;
     }
+
+    const bool enabled = m_coreController->m_settingsUiController->isAutoConnectEnabled();
+    const QString defaultServerId = m_coreController->m_serversController->getDefaultServerId();
+
+    // AND IT SAYS WHAT IT DECIDED, both ways. The operator turned this on, launched, and nothing
+    // connected - and there was no way to tell whether it had never fired, fired and been refused,
+    // or fired and failed. A feature that silently does not happen is the shape this project keeps
+    // paying for (#L012); one line removes the question.
+    if (!enabled) {
+        qDebug() << "auto-connect: off in settings";
+        return;
+    }
+    if (defaultServerId.isEmpty()) {
+        qDebug() << "auto-connect: on, but no rent is set up yet - nothing to connect to";
+        return;
+    }
+    qDebug() << "auto-connect: on, arming for" << defaultServerId;
+    QTimer::singleShot(1000, this, [this, defaultServerId]() {
+        qDebug() << "auto-connect: firing for" << defaultServerId;
+        m_coreController->m_connectionUiController->toggleConnection();
+    });
 }
 
 void CoreSignalHandlers::initAmneziaDnsToggledHandler()

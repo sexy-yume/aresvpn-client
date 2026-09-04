@@ -48,6 +48,17 @@
 
 bool AmneziaApplication::m_forceQuit = false;
 
+// See the header. One list, read by main.cpp and by the auto-connect handler, so the two can never
+// disagree about what a harness run is.
+bool AmneziaApplication::isHarnessMode()
+{
+    const QStringList args = QCoreApplication::arguments();
+    return args.contains(QStringLiteral("--qml-smoke"))
+            || args.contains(QStringLiteral("--qml-shot"))
+            || args.contains(QStringLiteral("--qml-drive"))
+            || args.contains(QStringLiteral("--font-report"));
+}
+
 AmneziaApplication::AmneziaApplication(int &argc, char *argv[]) : AMNEZIA_BASE_CLASS(argc, argv),
       m_optAutostart({QStringLiteral("a"), QStringLiteral("autostart")}, QStringLiteral("System autostart")),
       m_optCleanup  ({QStringLiteral("c"), QStringLiteral("cleanup")}, QStringLiteral("Cleanup logs")),

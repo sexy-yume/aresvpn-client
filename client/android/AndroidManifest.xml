@@ -70,12 +70,7 @@
 
         </activity>
 
-        <activity
-            android:name=".CameraActivity"
-            android:excludeFromRecents="true"
-            android:launchMode="singleTask"
-            android:taskAffinity=""
-            android:exported="false" />
+        <!-- CameraActivity is removed with ML Kit (#D178, #D187). See build.gradle.kts. -->
 
         <activity
             android:name=".VpnRequestActivity"

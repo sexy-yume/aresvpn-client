@@ -952,10 +952,14 @@ class AmneziaActivity : QtActivity() {
 
     @Suppress("unused")
     fun startQrCodeReader() {
-        Log.v(TAG, "Start camera")
-        Intent(this, CameraActivity::class.java).also {
-            startActivity(it)
-        }
+        // The QR path is gone with ML Kit (#D178: closed-source, so a GPL-3 binary carrying it
+        // cannot be conveyed; #D187: a rent arrives by signing in, there is nothing to scan).
+        //
+        // The METHOD stays, because android_controller.cpp reaches it by NAME over JNI -
+        // callActivityMethod("startQrCodeReader", "()V") - and a missing method there aborts at
+        // runtime instead of failing to compile. No screen can reach it; if one ever does, this
+        // line says why nothing happened rather than leaving a dead button.
+        Log.w(TAG, "startQrCodeReader: the QR reader is not part of this product (#D178, #D187)")
     }
 
     @Suppress("unused")

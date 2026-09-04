@@ -186,8 +186,23 @@ dependencies {
     implementation(libs.androidx.fragment)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.protobuf)
-    implementation(libs.bundles.androidx.camera)
-    implementation(libs.google.mlkit)
+    // ML KIT AND THE CAMERA STACK ARE GONE (AresProject #D178, #D187).
+    //
+    // `com.google.mlkit:barcode-scanning` is closed-source and not a system library, so a GPL-3
+    // binary that links it cannot be conveyed - #D178 makes "no Android binary while ML Kit is
+    // linked" a release condition rather than a preference. It existed for ONE feature: reading a
+    // configuration out of a QR code.
+    //
+    // Under #D187 that feature is unreachable, and this was measured rather than assumed. The
+    // chain is PageSetupWizardConfigSource -> PageSetupWizardQrReader ->
+    // android_controller.cpp::startQrCodeReader -> CameraActivity -> ML Kit, and the config-source
+    // chooser has exactly two callers - ConnectionTypeSelectionDrawer and PageSetupWizardStart -
+    // NEITHER of which is referenced by anything any more: the drawer by nothing at all, the start
+    // page by nothing since #D182 made our login the first screen. The tab bar's "+" was the last
+    // route and #D187 removed it.
+    //
+    // A rent arrives by signing in with id + password + idx. There is no configuration to scan.
+    // CameraX goes with it: it is in this build only to feed frames to the scanner.
     implementation(libs.androidx.datastore)
     implementation(libs.androidx.biometric)
 

@@ -10,6 +10,28 @@
 AresProfileUiController::AresProfileUiController(AresProfileController *controller, QObject *parent)
     : QObject(parent), m_controller(controller)
 {
+    if (!m_controller) {
+        return;
+    }
+    // The core polls on its own timer (#D187 point 6); QML needs to hear about it, because a rent
+    // swapped underneath a live tunnel has to be reconnected onto, not merely re-stored.
+    connect(m_controller, &AresProfileController::sessionRentChanged, this,
+            [this](const QString &serverId, const QString &) {
+                m_lastServerId = serverId;
+                emit sessionRentChanged(serverId);
+                emit sessionChanged();
+            });
+    connect(m_controller, &AresProfileController::sessionRefreshFailed, this,
+            &AresProfileUiController::sessionRefreshFailed);
+    connect(m_controller, &AresProfileController::sessionChanged, this,
+            &AresProfileUiController::sessionChanged);
+
+    // Start the poll if this device is already signed in - the customer does not press anything to
+    // get it, which is the whole point (#D187: a server-side re-allocation must reach the client
+    // without a manual re-login, or that finished feature stays 반쪽짜리).
+    if (m_controller->hasSession()) {
+        m_controller->startSessionPolling();
+    }
 }
 
 QString AresProfileUiController::endpoint() const
@@ -26,7 +48,9 @@ bool AresProfileUiController::login(const QString &id, const QString &password, 
         emit lastErrorChanged();
         return false;
     }
-    const AresProfileController::Result r = m_controller->fetchAndImport(id, password, idx);
+    // loginSession, not fetchAndImport: this REPLACES the session and takes the previous rent with
+    // it. Calling fetchAndImport here is what made the product a collection of rents (#D187).
+    const AresProfileController::Result r = m_controller->loginSession(id, password, idx);
     if (r.errorCode != amnezia::ErrorCode::NoError) {
         m_lastError = r.message.isEmpty() ? errorString(r.errorCode) : r.message;
         emit lastErrorChanged();
@@ -34,7 +58,58 @@ bool AresProfileUiController::login(const QString &id, const QString &password, 
     }
     m_lastServerId = r.serverId;
     emit loginFinished(m_lastServerId);
+    emit sessionChanged();
     return true;
+}
+
+bool AresProfileUiController::hasSession() const
+{
+    return m_controller && m_controller->hasSession();
+}
+
+QString AresProfileUiController::sessionAccountId() const
+{
+    return m_controller ? m_controller->sessionAccountId() : QString();
+}
+
+QString AresProfileUiController::sessionIdx() const
+{
+    return m_controller ? m_controller->sessionIdx() : QString();
+}
+
+QString AresProfileUiController::sessionServerId() const
+{
+    return m_controller ? m_controller->sessionServerId() : QString();
+}
+
+bool AresProfileUiController::refreshNow()
+{
+    m_lastError.clear();
+    if (!m_controller) {
+        return false;
+    }
+    bool changed = false;
+    const AresProfileController::Result r = m_controller->refreshSession(&changed);
+    if (r.errorCode != amnezia::ErrorCode::NoError) {
+        m_lastError = r.message.isEmpty() ? errorString(r.errorCode) : r.message;
+        emit lastErrorChanged();
+        return false;
+    }
+    if (changed) {
+        m_lastServerId = r.serverId;
+    }
+    emit sessionChanged();
+    return changed;
+}
+
+void AresProfileUiController::logout()
+{
+    if (m_controller) {
+        m_controller->logoutSession();
+    }
+    m_lastServerId.clear();
+    m_lastError.clear();
+    emit sessionChanged();
 }
 
 // -1 means the console never told us - a config pasted in by hand rather than fetched by a login.

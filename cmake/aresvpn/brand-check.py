@@ -64,7 +64,7 @@ PAGE_REF = re.compile(r"PageEnum\.(\w+)")
 
 # Where this product's navigation actually starts. PageStart is the shell, main2.qml is always
 # loaded, and the other three are #D182's own screens.
-ROOTS = ["PageStart", "PageHome", "PageSettings", "PageSetupWizardAresLogin", "PageAresRents"]
+ROOTS = ["PageStart", "PageHome", "PageSettings", "PageSetupWizardAresLogin", "PageAresSession"]
 
 # DEAD SURFACE. These screens belong to products this fork does not sell - Amnezia's Premium
 # catalogue and the self-hosted server installer - and 18-3e closes their front doors with a
@@ -288,7 +288,7 @@ def run_selftest(root):
 
     reach, pages = reachable_pages(root)
     check("the walk finds the home screen", "PageHome" in reach)
-    check("the walk finds the rent list from the home screen", "PageAresRents" in reach)
+    check("the walk finds the session screen from the home screen", "PageAresSession" in reach)
     check("the walk finds the login", "PageSetupWizardAresLogin" in reach)
     check("it did not simply reach everything", len(reach) < len(pages))
     # NOTE what is NOT asserted here, and it is the honest half. An earlier version asserted the

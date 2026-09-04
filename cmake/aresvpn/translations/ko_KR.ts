@@ -51,7 +51,7 @@
     </message>
 </context>
 <context>
-    <name>PageAresRents</name>
+    <name>PageAresSession</name>
     <message>
         <source>Rents</source>
         <translation>렌트</translation>

@@ -323,6 +323,28 @@ void SecureAppSettingsRepository::forgetRentExpiry(const QString &serverId)
     }
 }
 
+// AresVPN Client - the login session (#D187). See the header for why the password is in it.
+QVariantMap SecureAppSettingsRepository::getAresSession() const
+{
+    return value("Conf/aresSession").toMap();
+}
+
+void SecureAppSettingsRepository::setAresSession(const QString &id, const QString &password,
+                                                 const QString &idx, const QString &serverId)
+{
+    QVariantMap map;
+    map.insert(QStringLiteral("id"), id);
+    map.insert(QStringLiteral("pw"), password);
+    map.insert(QStringLiteral("idx"), idx);
+    map.insert(QStringLiteral("serverId"), serverId);
+    setValue("Conf/aresSession", map);
+}
+
+void SecureAppSettingsRepository::clearAresSession()
+{
+    setValue("Conf/aresSession", QVariantMap());
+}
+
 void SecureAppSettingsRepository::resetGatewayEndpoint()
 {
     m_gatewayEndpoint = gatewayEndpoint;

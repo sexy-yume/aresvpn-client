@@ -140,7 +140,7 @@ PageType {
                 Layout.leftMargin: 16
                 Layout.rightMargin: 16
 
-                text: qsTr("Add this rent")
+                text: AresProfileController.hasSession ? qsTr("Switch to this rent") : qsTr("Sign in")
 
                 // The accent, like every other primary action in this product. Rendered on the
                 // real platform and looked at (#L055), this was the ONE button that was not:
@@ -162,7 +162,14 @@ PageType {
                 Layout.rightMargin: 16
                 Layout.bottomMargin: 16
 
-                text: qsTr("Your password is sent once, over TLS, to %1 and is not stored on this device. The rent's configuration is.").arg(AresProfileController.endpoint)
+                // #D187: the password IS stored now, and saying otherwise would be a false statement to a
+                // customer about what is on their own disk. It is the operator's decision
+                // (*비밀번호를 기기에 저장한다*), and it is what lets this device follow its idx
+                // when the console re-assigns the rent behind it - without which the server
+                // side's automatic re-allocation stays half a feature.
+                text: qsTr("Signing in stores your account and this rent on this device, encrypted, "
+                           + "so the app can follow your idx if the rent behind it changes. "
+                           + "Your password goes to %1 over TLS.").arg(AresProfileController.endpoint)
             }
         }
     }
@@ -184,7 +191,7 @@ PageType {
             return
         }
         pwField.textField.text = ""
-        PageController.showNotificationMessage(qsTr("Rent %1 added").arg(idx))
+        PageController.showNotificationMessage(qsTr("Signed in - %1").arg(idx))
         PageController.goToPageHome()
     }
 }

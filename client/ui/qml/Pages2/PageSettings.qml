@@ -212,7 +212,7 @@ PageType {
         {
             title: qsTr("Rents"),
             subtitle: qsTr("Add, switch or remove a rent"),
-            page: PageEnum.PageAresRents
+            page: PageEnum.PageAresSession
         },
         {
             title: qsTr("Connection"),

@@ -330,7 +330,7 @@ void AmneziaApplication::init()
         const QMetaEnum pages = QMetaEnum::fromType<PageLoader::PageEnum>();
         const QStringList wanted = {
             QStringLiteral("PageHome"),
-            QStringLiteral("PageAresRents"),
+            QStringLiteral("PageAresSession"),
             QStringLiteral("PageSetupWizardAresLogin"),
             QStringLiteral("PageSettings"),
             QStringLiteral("PageSettingsConnection"),
@@ -614,7 +614,7 @@ void AmneziaApplication::init()
             drive.settle(20);
             drive.expectPage(QStringLiteral("page:PageHome"));
 
-            drive.clickTo(QStringLiteral("home.rents"), QStringLiteral("page:PageAresRents"));
+            drive.clickTo(QStringLiteral("home.rents"), QStringLiteral("page:PageAresSession"));
             drive.reportTruncated(QStringLiteral("the rent list"));
             drive.shot(QStringLiteral("rents"));
 

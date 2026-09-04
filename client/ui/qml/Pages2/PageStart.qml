@@ -24,9 +24,11 @@ PageType {
         target: PageController
 
         function onGoToPageHome() {
-            if (PageController.isStartPageVisible()) {
-                // AresVPN Client (#D182): no rent left - back to the login, the same screen a
-                // first run opens on, rather than upstream's SSH/Premium wizard.
+            if (!AresProfileController.hasSession) {
+                // AresVPN Client (#D187, superseding #D182): the branch is WHETHER THERE IS A
+                // SESSION - not whether any server is stored. Those two coincide only by accident,
+                // and building on the second is what turned this product into Amnezia's server
+                // list with our login bolted onto its import screen.
                 tabBar.visible = false
                 tabBarStackView.goToTabBarPage(PageEnum.PageSetupWizardAresLogin)
             } else {
@@ -287,12 +289,14 @@ PageType {
 
         Component.onCompleted: {
             var pagePath
-            if (PageController.isStartPageVisible()) {
-                // AresVPN Client (AresProject 18-3h, the operator's requirement): with no rent
-                // stored there is nothing to choose, so the first screen IS the login - not
-                // upstream's wizard, which offers to install a server over SSH or open a Premium
-                // catalogue, neither of which is this product. isStartPageVisible() is exactly
-                // "zero servers stored", so this is the first-run branch.
+            if (!AresProfileController.hasSession) {
+                // AresVPN Client (#D187, the operator's requirement in their own words: *키자마자
+                // 로그인이 안되어있으면 로그인화면이 나오고*). NOT SIGNED IN -> the login is the
+                // first screen. This used to read `isStartPageVisible()`, which is exactly "zero
+                // servers stored" - a different question. A device can hold a stored server and
+                // not be signed in (a config imported by hand), and a signed-in device whose rent
+                // the console has not answered for yet holds none; the session is the state that
+                // decides, and it is the only one.
                 tabBar.visible = false
                 pagePath = PageController.getPagePath(PageEnum.PageSetupWizardAresLogin)
             } else {
@@ -424,22 +428,11 @@ PageType {
             }
         }
 
-        TabImageButtonType {
-            id: plusTabButton
-            objectName: "plusTabButton"
-
-            isSelected: tabBar.currentIndex === 3
-            image: "qrc:/images/controls/plus.svg"
-            clickedFunc: function () {
-                // AresVPN Client (#D182): "+" means ADD A RENT, and a rent is added by logging in
-                // with id + password + idx. Upstream sent this button to PageSetupWizardConfigSource
-                // - the file / QR / text-key / SSH-install chooser - which is a screen this product
-                // does not use, reachable from the chrome that is visible on EVERY screen. That is
-                // the second rule of #D182 broken by one button, and it survived the whole rebuild
-                // because the tab bar was never looked at.
-                tabBarStackView.goToTabBarPage(PageEnum.PageSetupWizardAresLogin)
-                tabBar.currentIndex = 3
-            }
-        }
+        // THE "+" TAB IS GONE (AresVPN Client, #D187). Under a session model there is nothing to
+        // add: this device holds ONE session, and changing rent means changing the session's idx,
+        // which is a different act with a different screen. The button first pointed at upstream's
+        // config-source wizard (file / QR / text key / SSH install) and was then repointed at the
+        // login as "add a rent" - both were the same misreading, and the operator named it:
+        // *지금처럼 + 버튼 눌러서 id pw idx입력해서 설정만 가져와서 렌트목록에 추가하는게 아님*.
     }
 }

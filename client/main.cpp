@@ -62,11 +62,29 @@ int main(int argc, char *argv[])
     });
 
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS) && !defined(MACOS_NE)
-    if (isAnotherInstanceRunning()) {
-        QTimer::singleShot(1000, &app, [&]() { app.quit(); });
-        return app.exec();
+    // AresVPN Client: the HARNESS modes are exempt from the single-instance guard, and they must
+    // be. They open no window, take no focus, touch no tunnel and exit on their own - they are a
+    // measurement of this build, not a second copy of the product competing for the tray icon.
+    //
+    // Measured, and it is why this exists: with the operator's own client running, every harness
+    // run died at this line with `AresVPNClient is already running` on stderr and NOTHING on
+    // stdout. A run that prints nothing reads exactly like a clean run (#L054's silent zero), and
+    // the only reason it was caught is that the verification script now REQUIRES its own marker
+    // line rather than trusting an empty capture.
+    //
+    // A harness mode also does not call startLocalServer(): claiming that name would make the
+    // running client think a second instance had appeared.
+    const bool aresHarnessMode = app.arguments().contains(QStringLiteral("--qml-smoke"))
+            || app.arguments().contains(QStringLiteral("--qml-shot"))
+            || app.arguments().contains(QStringLiteral("--qml-drive"))
+            || app.arguments().contains(QStringLiteral("--font-report"));
+    if (!aresHarnessMode) {
+        if (isAnotherInstanceRunning()) {
+            QTimer::singleShot(1000, &app, [&]() { app.quit(); });
+            return app.exec();
+        }
+        app.startLocalServer();
     }
-    app.startLocalServer();
 #endif
 
 // Allow to raise app window if secondary instance launched

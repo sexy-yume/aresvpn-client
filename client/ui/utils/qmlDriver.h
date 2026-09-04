@@ -12,7 +12,7 @@
 // there is no window on screen to steal focus from.
 //
 // It finds controls by objectName, which the screens set, so a step reads like the sentence a
-// tester would say: click "home.rents", expect "page:PageAresRents".
+// tester would say: click "home.rents", expect "page:PageAresSession".
 //
 // WHAT IT DELIBERATELY DOES NOT DO: press Connect. That would start a real tunnel from an
 // unattended process, and a stray tunnel with a kill switch has already cost this project the

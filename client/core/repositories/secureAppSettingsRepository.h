@@ -77,6 +77,24 @@ public:
     QString getRentExpiry(const QString &serverId) const;
     void setRentExpiry(const QString &serverId, const QString &expiresAtIso);
     void forgetRentExpiry(const QString &serverId);
+
+    // AresVPN Client - THE LOGIN SESSION (AresProject #D187). One session, not a list: `id` + `pw`
+    // + `idx`, plus the id of the one stored server that session currently owns.
+    //
+    // THE PASSWORD IS HERE ON PURPOSE, and it is the operator's decision rather than mine
+    // (*비밀번호를 기기에 저장한다*, #L007). It is what lets the client re-ask `/api/profile` for its
+    // `idx` without the customer, which is the whole of #D187 point 6: the server side already
+    // re-assigns a rent when a slot's address is re-allocated, and downloading only on a manual
+    // re-login leaves that finished feature half-working. This map lives in SecureQSettings, the
+    // same encrypted store the configurations use; it never reaches a command line (#D030) or a log.
+    //
+    // Keys: "id", "pw", "idx", "serverId". An empty map means NOT LOGGED IN, which is the branch
+    // the first screen reads - not "zero servers stored", which is what #D182 was implemented as
+    // and is a different question that only coincides by accident.
+    QVariantMap getAresSession() const;
+    void setAresSession(const QString &id, const QString &password, const QString &idx,
+                        const QString &serverId);
+    void clearAresSession();
     void writeGatewayProxyUrls(const QString &cacheKey, const QByteArray &proxyUrlsEncrypted);
 
     bool isKillSwitchEnabled() const;

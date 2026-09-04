@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AresVPN. Licensed under the GNU General Public License v3.0 (see LICENSE).
 #include "aresProfileController.h"
 
+#include <QTimer>
+
 #include <QEventLoop>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -265,6 +267,170 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
 
     emit imported(serverId);
     return result;
+}
+
+// ---- THE LOGIN SESSION (AresProject #D187) --------------------------------------------------
+//
+// One session: id + pw + idx. The client is bound to the **idx**, not to a rent - whatever rent
+// carries that idx right now is the rent this device uses. That is the whole model, and it is why
+// there is no list here and nothing to add to.
+
+bool AresProfileController::hasSession() const
+{
+    return !sessionIdx().isEmpty();
+}
+
+QString AresProfileController::sessionAccountId() const
+{
+    return m_appSettingsRepository
+            ? m_appSettingsRepository->getAresSession().value(QStringLiteral("id")).toString()
+            : QString();
+}
+
+QString AresProfileController::sessionIdx() const
+{
+    return m_appSettingsRepository
+            ? m_appSettingsRepository->getAresSession().value(QStringLiteral("idx")).toString()
+            : QString();
+}
+
+QString AresProfileController::sessionServerId() const
+{
+    return m_appSettingsRepository
+            ? m_appSettingsRepository->getAresSession().value(QStringLiteral("serverId")).toString()
+            : QString();
+}
+
+// The previous session's server goes when the new one arrives. Removing it is the difference
+// between a session and a collection, and forgetting its expiry with it is #L023's residue rule
+// applied to the product's own storage - without that the map grows by one entry per rent the
+// customer ever held and never shrinks.
+void AresProfileController::adoptServer(const QString &newServerId, const QString &previousServerId)
+{
+    if (previousServerId.isEmpty() || previousServerId == newServerId) {
+        return;
+    }
+    if (m_serversRepository && m_serversRepository->orderedServerIds().contains(previousServerId)) {
+        m_serversRepository->removeServer(previousServerId);
+    }
+    if (m_appSettingsRepository) {
+        m_appSettingsRepository->forgetRentExpiry(previousServerId);
+    }
+}
+
+AresProfileController::Result AresProfileController::loginSession(const QString &id,
+                                                                  const QString &password,
+                                                                  const QString &idx)
+{
+    const QString previousServerId = sessionServerId();
+
+    Result r = fetchAndImport(id, password, idx);
+    if (r.errorCode != amnezia::ErrorCode::NoError) {
+        // A failed sign-in leaves the previous session exactly as it was. Signing in with the wrong
+        // password must not cost a customer the rent they already had.
+        return r;
+    }
+
+    adoptServer(r.serverId, previousServerId);
+    if (m_appSettingsRepository) {
+        m_appSettingsRepository->setAresSession(id, password, idx, r.serverId);
+    }
+    emit sessionChanged();
+    return r;
+}
+
+AresProfileController::Result AresProfileController::refreshSession(bool *changed)
+{
+    if (changed) {
+        *changed = false;
+    }
+    Result r;
+    if (!m_appSettingsRepository || !hasSession()) {
+        r.errorCode = amnezia::ErrorCode::AresBadCredentials;
+        r.message = tr("Not signed in.");
+        return r;
+    }
+    // One at a time. The poll timer and a manual refresh can both arrive, and fetchAndImport spins
+    // a nested event loop - re-entering it would interleave two imports over one session.
+    if (m_refreshing) {
+        r.message = tr("A refresh is already running.");
+        return r;
+    }
+    m_refreshing = true;
+
+    const QVariantMap session = m_appSettingsRepository->getAresSession();
+    const QString id = session.value(QStringLiteral("id")).toString();
+    const QString pw = session.value(QStringLiteral("pw")).toString();
+    const QString idx = session.value(QStringLiteral("idx")).toString();
+    const QString previousServerId = session.value(QStringLiteral("serverId")).toString();
+
+    r = fetchAndImport(id, pw, idx);
+    m_refreshing = false;
+
+    if (r.errorCode != amnezia::ErrorCode::NoError) {
+        // NOT A LOGOUT, and this is the failure the model has to be designed for. A 404 here means
+        // the rent behind this idx is gone and nothing has replaced it YET - which is precisely the
+        // window an operator is inside while they retire one rent and hang the same idx on another
+        // (#D187's update). Throwing the customer back to a login screen mid-swap would be worse
+        // than never refreshing at all. The session stands; the next poll picks up the replacement.
+        emit sessionRefreshFailed(r.message);
+        return r;
+    }
+
+    if (r.serverId != previousServerId) {
+        // A DIFFERENT RENT, not merely a new address: the idx now points somewhere else. Adopt it,
+        // drop the old one, and tell the UI so it can reconnect onto what the customer actually has.
+        adoptServer(r.serverId, previousServerId);
+        m_appSettingsRepository->setAresSession(id, pw, idx, r.serverId);
+        if (changed) {
+            *changed = true;
+        }
+        emit sessionRentChanged(r.serverId, previousServerId);
+        emit sessionChanged();
+    }
+    return r;
+}
+
+void AresProfileController::logoutSession()
+{
+    const QString serverId = sessionServerId();
+    if (!serverId.isEmpty() && m_serversRepository
+        && m_serversRepository->orderedServerIds().contains(serverId)) {
+        m_serversRepository->removeServer(serverId);
+    }
+    if (m_appSettingsRepository) {
+        m_appSettingsRepository->forgetRentExpiry(serverId);
+        m_appSettingsRepository->clearAresSession();
+    }
+    stopSessionPolling();
+    emit sessionChanged();
+}
+
+// The poll. Five minutes by default: the thing it is watching for is an operator re-allocating a
+// slot or swapping a rent, which is a human-speed event, and a shorter interval would put a request
+// on the console for every running client for no gain (#D061's login guard answers 429 to a client
+// that asks too often, and that guard is not to be worked around).
+void AresProfileController::startSessionPolling(int intervalSeconds)
+{
+    const int secs = intervalSeconds > 0 ? intervalSeconds : 300;
+    if (!m_pollTimer) {
+        m_pollTimer = new QTimer(this);
+        connect(m_pollTimer, &QTimer::timeout, this, [this]() {
+            if (!hasSession()) {
+                return;
+            }
+            bool changed = false;
+            refreshSession(&changed);
+        });
+    }
+    m_pollTimer->start(secs * 1000);
+}
+
+void AresProfileController::stopSessionPolling()
+{
+    if (m_pollTimer) {
+        m_pollTimer->stop();
+    }
 }
 
 QString AresProfileController::rentExpiry(const QString &serverId) const

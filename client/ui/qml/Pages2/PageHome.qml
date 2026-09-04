@@ -227,7 +227,7 @@ PageType {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: PageController.goToPage(PageEnum.PageAresRents)
+                    onClicked: PageController.goToPage(PageEnum.PageAresSession)
                 }
             }
 

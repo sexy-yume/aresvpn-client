@@ -10,6 +10,9 @@
 
 #include <QObject>
 #include <QString>
+#include <QVariantMap>
+
+class QTimer;
 
 #include "core/utils/errorCodes.h"
 
@@ -61,8 +64,47 @@ public:
     // so the shape can be checked without a network.
     static QString xrayConfigForSocks5(const QString &uri, QString *errorOut);
 
+    // ---- THE LOGIN SESSION (AresProject #D187) ------------------------------------------------
+    //
+    // The client holds ONE session - id + pw + idx - and is bound to the **idx**, not to a rent.
+    // Whatever rent carries that idx at this moment is the rent this device uses, so an operator
+    // can retire it, sell another and hang the same idx on the new one, and the client moves across
+    // on its own. That is why `refreshSession()` compares what the console returns for the idx
+    // against what is stored rather than asking whether one rent's address changed.
+    bool hasSession() const;
+    QString sessionAccountId() const;
+    QString sessionIdx() const;
+    QString sessionServerId() const;
+
+    // Sign in, or switch. REPLACES the session and takes the previous session's stored server and
+    // its expiry with it - there is nothing to add to (#D187 supersedes #D182 rule 2).
+    Result loginSession(const QString &id, const QString &password, const QString &idx);
+
+    // Ask the console what the session's idx points at NOW and adopt it if it has changed.
+    // `changed` is set when the stored server was replaced, which is the signal to hot-reload.
+    // A 404 (the rent behind the idx is gone and nothing has replaced it yet) is NOT a logout:
+    // the session stands, the caller is told, and the next poll picks up the replacement.
+    Result refreshSession(bool *changed = nullptr);
+
+    // Forget the session and remove the server it owns.
+    void logoutSession();
+
+    // Start/stop the periodic refresh. The interval is deliberately not a constant a caller has to
+    // remember: `start` with 0 uses the default.
+    void startSessionPolling(int intervalSeconds = 0);
+    void stopSessionPolling();
+
 signals:
     void imported(const QString &serverId);
+
+    // The session's rent was replaced under it - a new address, or an entirely different rent on
+    // the same idx. The UI reconnects/hot-reloads on this.
+    void sessionRentChanged(const QString &serverId, const QString &previousServerId);
+
+    // A refresh could not be made. Carries the console's own sentence; never a reason to log out.
+    void sessionRefreshFailed(const QString &message);
+
+    void sessionChanged();
 
 private:
     struct Reply
@@ -74,9 +116,15 @@ private:
     };
     Reply post(const QString &url, const QByteArray &jsonBody);
 
+    // Replace the server the session owns, removing the previous one and its expiry with it
+    // (#L023's residue rule, applied to the product's own storage).
+    void adoptServer(const QString &newServerId, const QString &previousServerId);
+
     ImportController *m_importController;
     SecureServersRepository *m_serversRepository;
     SecureAppSettingsRepository *m_appSettingsRepository;
+    QTimer *m_pollTimer = nullptr;
+    bool m_refreshing = false;
 };
 
 #endif // ARESPROFILECONTROLLER_H

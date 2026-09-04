@@ -50,7 +50,31 @@ set(SOURCES ${SOURCES}
 
 find_package(awg-android REQUIRED)
 set(LIBS ${LIBS} amnezia::awg-android)
-set_property(TARGET ${PROJECT} APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${AMNEZIA_ANDROID_LIBWG_PATH} ${AMNEZIA_ANDROID_LIBWG_QUICK_PATH})
+# AresVPN Client (AresProject #D192, ROADMAP 18-3e): `libwg.so` and `libwg-quick.so` ARE NOT
+# PACKAGED, and unlike the Cloak plugin below this was checked on four channels first (#L063 - which
+# was written an hour earlier, by getting exactly this wrong about that one).
+#
+#   1. DT_NEEDED   - no shipped .so requires either (`readelf -d` over all 107 in the APK)
+#   2. the loader  - no `System.loadLibrary`, and it could not work anyway (see 4)
+#   3. exec by name- nothing in `client/android` names them
+#   4. exec by path- the ONLY ProcessBuilder in the Android tree is `logcat -d`, in Log.kt
+#
+# And what they ARE settles it: `readelf -l` shows both carry an **INTERP segment and a non-zero
+# entry point**, so they are PIE EXECUTABLES - the `wg(8)` and `wg-quick(8)` command-line tools,
+# shipped as `lib*.so` because that is how Android extracts an executable. `libwg-go.so`, which the
+# tunnel actually uses through `GoBackend`'s JNI, has no INTERP and entry 0: a real library, and it
+# stays. An executable nothing execs is reachable by nothing at all.
+#
+# THIS ALSO CLOSES A LICENCE GAP RATHER THAN SAVING 164 672 BYTES. Survey 5.3 F04: these two are
+# built from `tunnel/tools`, they are wireguard-tools rather than amneziawg-go, **their licence is
+# not in this tree**, and it would have to be read against the `v3.1.20260814` tag before an APK is
+# conveyed. Not shipping them means no Corresponding Source duty to discharge for them (#D178).
+#
+# The recipe still builds them, so the conan graph and every package_id are unchanged.
+option(ARES_SHIP_WG_TOOLS "Package the wg/wg-quick command-line tools (PIE executables nothing execs)" OFF)
+if(ARES_SHIP_WG_TOOLS)
+    set_property(TARGET ${PROJECT} APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${AMNEZIA_ANDROID_LIBWG_PATH} ${AMNEZIA_ANDROID_LIBWG_QUICK_PATH})
+endif()
 
 find_package(amnezia-libxray REQUIRED)
 file(COPY ${AMNEZIA_LIBXRAY_PATH} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/android/xray/libXray)

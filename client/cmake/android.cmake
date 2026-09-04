@@ -76,6 +76,24 @@ option(ARES_SHIP_CLOAK_PLUGIN "Package Cloak's OpenVPN plugin (7.4 MB of GPL-3 t
 if(ARES_SHIP_CLOAK_PLUGIN)
     set_property(TARGET ${PROJECT} APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${OPENVPN_PT_ANDROID_LIBCK_OVPN_PLUGIN_PATH})
 endif()
+# !!! THIS IS NOT ENOUGH, AND THE APK SAYS SO. Measured after the change, on the branded artefact
+# (#L019 - the commit that made it promised this check and it is why the gap is known):
+#
+#     lib/arm64-v8a/libck-ovpn-plugin.so   7 424 088 bytes   STILL PRESENT
+#     APK 70 394 268 B, unchanged in size
+#
+# So `QT_ANDROID_EXTRA_LIBS` is not the only route into the package, and the second one has not been
+# identified - `androiddeployqt`'s own dependency scan over the linked conan packages' lib folders
+# is the leading candidate, since `amnezia::openvpn-pt-android` is in LIBS and its package holds the
+# .so beside the ones we do use. The option above is correct for the channel it governs and
+# INSUFFICIENT on its own; leaving it without this note would read as a solved problem, which is the
+# defect class this fork keeps paying for (#L038).
+#
+# NEXT STEP for whoever picks this up: build with `--verbose` androiddeployqt output, or diff the
+# generated `android-<target>-deployment-settings.json`, to name the second route before changing
+# anything else. Dropping `ck_ovpn_plugin_go` from the recipe's build targets closes it at the
+# source, at the cost of a fork-owned recipe edit - and #D191 already measured that this component
+# publishes no prebuilt, so that edit costs no build time either.
 
 set(APP_ANDROID_PACKAGE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/android)
 

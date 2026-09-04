@@ -34,90 +34,114 @@
 <context>
     <name>PageHome</name>
     <message>
-        <source>No rent yet</source>
-        <translation>아직 렌트가 없습니다</translation>
+        <source>Not signed in</source>
+        <translation>로그인되지 않음</translation>
     </message>
     <message>
-        <source>Add one with your account id, password and its idx</source>
-        <translation>계정 아이디와 비밀번호, 그리고 렌트의 idx로 추가하세요</translation>
+        <source>Sign in with your account id, password and rent idx</source>
+        <translation>계정 아이디, 비밀번호, 렌트 idx로 로그인하세요</translation>
     </message>
     <message>
-        <source>Rents</source>
-        <translation>렌트</translation>
+        <source>Account</source>
+        <translation>계정</translation>
     </message>
     <message>
-        <source>Switch, add or remove</source>
-        <translation>전환, 추가, 삭제</translation>
+        <source>idx %1 - change it, or sign out</source>
+        <translation>idx %1 - 변경하거나 로그아웃</translation>
+    </message>
+    <message>
+        <source>Sign in to use a rent</source>
+        <translation>렌트를 사용하려면 로그인하세요</translation>
+    </message>
+    <message>
+        <source>Connect</source>
+        <translation>연결</translation>
+    </message>
+    <message>
+        <source>Disconnect</source>
+        <translation>연결 끊기</translation>
     </message>
 </context>
 <context>
     <name>PageAresSession</name>
     <message>
-        <source>Rents</source>
-        <translation>렌트</translation>
+        <source>Account</source>
+        <translation>계정</translation>
     </message>
     <message>
-        <source>Each rent is one public address on one node. Tap to make it the one you connect with.</source>
-        <translation>렌트 하나는 노드 한 대의 공인 IP 하나입니다. 눌러서 접속에 사용할 렌트로 지정하세요.</translation>
+        <source>This device is signed in to one account and bound to one idx. Whichever rent carries that idx is the rent it uses - if it changes, this app follows it.</source>
+        <translation>이 기기는 계정 하나에 로그인되어 있고 idx 하나에 묶여 있습니다. 그 idx를 가진 렌트가 이 기기가 쓰는 렌트이며, 렌트가 바뀌면 앱이 알아서 따라갑니다.</translation>
     </message>
     <message>
-        <source>Disconnect before switching to another rent.</source>
-        <translation>다른 렌트로 바꾸려면 먼저 연결을 끊으세요.</translation>
+        <source>Rent idx</source>
+        <translation>렌트 idx</translation>
     </message>
     <message>
-        <source>EXPIRED</source>
-        <translation>만료됨</translation>
+        <source>The rent behind it right now</source>
+        <translation>지금 그 idx에 연결된 렌트</translation>
     </message>
     <message>
-        <source>LIVE</source>
-        <translation>연결됨</translation>
+        <source>no expiry recorded</source>
+        <translation>만료일 정보 없음</translation>
     </message>
     <message>
-        <source>SELECTED</source>
-        <translation>선택됨</translation>
+        <source>Check now</source>
+        <translation>지금 확인</translation>
     </message>
     <message>
-        <source>Disconnect before removing the rent you are using.</source>
-        <translation>사용 중인 렌트를 삭제하려면 먼저 연결을 끊으세요.</translation>
+        <source>The app checks on its own; this asks straight away</source>
+        <translation>앱이 주기적으로 확인합니다. 이건 즉시 확인합니다</translation>
     </message>
     <message>
-        <source>An HTTP proxy rent will not appear here - it is used from a browser or curl, with the address on its page in the AresVPN console.</source>
-        <translation>HTTP 프록시 렌트는 여기에 나오지 않습니다. 브라우저나 curl에서 AresVPN 콘솔의 렌트 페이지에 적힌 주소로 사용합니다.</translation>
+        <source>Use a different rent</source>
+        <translation>다른 렌트 사용</translation>
     </message>
     <message>
-        <source>Add a rent</source>
-        <translation>렌트 추가</translation>
+        <source>Sign in with another idx, or another account</source>
+        <translation>다른 idx로, 또는 다른 계정으로 로그인</translation>
     </message>
     <message>
-        <source>Remove %1?</source>
-        <translation>%1을(를) 삭제할까요?</translation>
+        <source>Sign out</source>
+        <translation>로그아웃</translation>
     </message>
     <message>
-        <source>The rent itself is not cancelled - only this device forgets it. Log in with the same idx to get it back.</source>
-        <translation>렌트 자체가 해지되는 것은 아니고, 이 기기에서만 잊힙니다. 같은 idx로 다시 로그인하면 그대로 돌아옵니다.</translation>
+        <source>This device forgets the account and the rent</source>
+        <translation>이 기기가 계정과 렌트를 잊습니다</translation>
     </message>
     <message>
-        <source>Keep</source>
-        <translation>유지</translation>
+        <source>Sign out of %1?</source>
+        <translation>%1 계정에서 로그아웃할까요?</translation>
     </message>
     <message>
-        <source>Remove</source>
-        <translation>삭제</translation>
+        <source>This device forgets your account and removes the rent it holds. The rent itself is not cancelled - sign in with the same idx to get it back.</source>
+        <translation>이 기기가 계정을 잊고 보관 중인 렌트를 삭제합니다. 렌트 자체가 해지되는 것은 아니며, 같은 idx로 다시 로그인하면 그대로 돌아옵니다.</translation>
+    </message>
+    <message>
+        <source>Stay signed in</source>
+        <translation>로그인 유지</translation>
+    </message>
+    <message>
+        <source>Your rent changed - this device has the new one.</source>
+        <translation>렌트가 바뀌었습니다. 이 기기가 새 렌트를 받았습니다.</translation>
+    </message>
+    <message>
+        <source>Already up to date.</source>
+        <translation>이미 최신입니다.</translation>
     </message>
 </context>
 <context>
     <name>PageSettings</name>
     <message>
-        <source>Rents</source>
-        <translation>렌트</translation>
+        <source>Account</source>
+        <translation>계정</translation>
     </message>
     <message>
         <source>About</source>
         <translation>정보</translation>
     </message>
     <message>
-        <source>Add, switch or remove a rent</source>
-        <translation>렌트 추가, 전환, 삭제</translation>
+        <source>Who is signed in, which idx, and the rent behind it</source>
+        <translation>누가 로그인했는지, 어떤 idx인지, 그 뒤의 렌트</translation>
     </message>
     <message>
         <source>Kill switch, split tunnelling and DNS</source>
@@ -327,20 +351,28 @@ The same texts are installed beside the program&apos;s executable, and the compl
         <translation>예: odin_1</translation>
     </message>
     <message>
-        <source>Add this rent</source>
-        <translation>이 렌트 추가</translation>
-    </message>
-    <message>
-        <source>Your password is sent once, over TLS, to %1 and is not stored on this device. The rent&apos;s configuration is.</source>
-        <translation>비밀번호는 TLS로 %1에 한 번만 전송되며 이 기기에 저장되지 않습니다. 저장되는 것은 렌트의 설정 파일입니다.</translation>
+        <source>Sign in</source>
+        <translation>로그인</translation>
     </message>
     <message>
         <source>All three fields are needed.</source>
         <translation>세 항목을 모두 입력해야 합니다.</translation>
     </message>
     <message>
-        <source>Rent %1 added</source>
-        <translation>렌트 %1을(를) 추가했습니다</translation>
+        <source>Switch to this rent</source>
+        <translation>이 렌트로 전환</translation>
+    </message>
+    <message>
+        <source>Signing in stores your account and this rent on this device, encrypted, so the app can follow your idx if the rent behind it changes. Your password goes to %1 over TLS.</source>
+        <translation>로그인하면 계정과 이 렌트가 이 기기에 암호화되어 저장됩니다. 그래야 idx 뒤의 렌트가 바뀔 때 앱이 따라갈 수 있습니다. 비밀번호는 TLS로 %1에 전송됩니다.</translation>
+    </message>
+    <message>
+        <source>Signed in - %1</source>
+        <translation>로그인됨 - %1</translation>
+    </message>
+    <message>
+        <source>Password</source>
+        <translation>비밀번호</translation>
     </message>
 </context>
 </TS>

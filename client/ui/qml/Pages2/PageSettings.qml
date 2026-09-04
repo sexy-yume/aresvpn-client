@@ -210,8 +210,8 @@ PageType {
 
     readonly property var groups: [
         {
-            title: qsTr("Rents"),
-            subtitle: qsTr("Add, switch or remove a rent"),
+            title: qsTr("Account"),
+            subtitle: qsTr("Who is signed in, which idx, and the rent behind it"),
             page: PageEnum.PageAresSession
         },
         {

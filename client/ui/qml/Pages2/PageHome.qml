@@ -114,7 +114,7 @@ PageType {
                 // behind a protocol name the line below already carries. Seen by rendering it.
                 text: root.hasRent
                     ? AresProfileController.addressOnly(ServersUiController.defaultServerDescriptionCollapsed)
-                    : qsTr("No rent yet")
+                    : qsTr("Not signed in")
                 color: AresStyle.color.text
                 font.family: AresStyle.font.mono
                 font.pixelSize: AresStyle.size.display
@@ -126,7 +126,7 @@ PageType {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillWidth: true
                 text: {
-                    if (!root.hasRent) return qsTr("Add one with your account id, password and its idx")
+                    if (!root.hasRent) return qsTr("Sign in with your account id, password and rent idx")
                     var idx = ServersUiController.defaultServerName
                     var proto = ServersUiController.defaultServerDefaultContainerName
                     return proto === "" ? idx : idx + "  ·  " + proto
@@ -199,13 +199,15 @@ PageType {
                     ColumnLayout {
                         spacing: 1
                         Text {
-                            text: qsTr("Rents")
+                            text: qsTr("Account")
                             color: AresStyle.color.text
                             font.family: AresStyle.font.family
                             font.pixelSize: AresStyle.size.body
                         }
                         Text {
-                            text: qsTr("Switch, add or remove")
+                            text: AresProfileController.sessionIdx !== ""
+                                  ? qsTr("idx %1 - change it, or sign out").arg(AresProfileController.sessionIdx)
+                                  : qsTr("Sign in to use a rent")
                             color: AresStyle.color.textMute
                             font.family: AresStyle.font.family
                             font.pixelSize: AresStyle.size.label

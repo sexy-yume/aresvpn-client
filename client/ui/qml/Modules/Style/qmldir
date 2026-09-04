@@ -1,3 +1,4 @@
 module Style
 
 singleton AmneziaStyle 1.0 AmneziaStyle.qml
+singleton AresStyle 1.0 AresStyle.qml

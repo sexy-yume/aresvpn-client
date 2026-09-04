@@ -79,6 +79,7 @@
         <file>Filters/ContainersModelFilters.qml</file>
         <file>main2.qml</file>
         <file>Modules/Style/AmneziaStyle.qml</file>
+        <file>Modules/Style/AresStyle.qml</file>
         <file>Modules/Style/qmldir</file>
         <file>Pages2/PageDeinstalling.qml</file>
         <file>Pages2/PageDevMenu.qml</file>
@@ -136,6 +137,7 @@
         <file>Pages2/PageSetupWizardConfigSource.qml</file>
         <file>Pages2/PageSetupWizardCredentials.qml</file>
         <file>Pages2/PageSetupWizardAresLogin.qml</file>
+        <file>Pages2/PageAresRents.qml</file>
         <file>Pages2/PageSetupWizardEasy.qml</file>
         <file>Pages2/PageSetupWizardInstalling.qml</file>
         <file>Pages2/PageSetupWizardProtocols.qml</file>

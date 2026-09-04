@@ -108,8 +108,19 @@ bool WireguardUtilsWindows::addInterface(const InterfaceConfig& config) {
   // WireGuard client does and is the ONE structural difference left between it and
   // us after every other cause was measured and killed
   // (AresProject docs/reviews/2026-09-04-client-wireguard-connect-diagnosis.md).
-  // updatePeer() still runs and is idempotent - it re-sets the same peer and is the
-  // only thing that carries the preshared key, which toWgConf() does not write.
+  // updatePeer() still runs, but it SKIPS its first UAPI set for this key: re-sending
+  // endpoint + replace_allowed_ips tore the fresh session down 670 ms in and cost a 15 s
+  // "stopped hearing back" timeout. Its firewall rules and exclusion routes still run.
+  // The preshared key travels in [Peer] now (InterfaceConfig::toWgConf), because that UAPI
+  // set used to be the only thing carrying it.
+  //
+  // ONE THING THIS CHANGED AND NOBODY HAS READ: the conf handed to the tunnel is no longer
+  // interface-only. `Table = off` above is unchanged, and the pre-fix diagnosis eliminated
+  // the tunnel's OWN built-in firewall on the grounds that an interface-only conf with
+  // `Table = off` takes the doNotRestrict path. Whether that path also depends on the peer
+  // list is UNREAD - amneziawg-windows is a Conan prebuilt here and its source is not in
+  // this tree. It is a candidate for the still-open return direction and it is written down
+  // rather than assumed either way (AresProject ROADMAP 18-3c).
 
   if (!m_tunnel.start(configString)) {
     logger.error() << "Failed to activate the tunnel service";

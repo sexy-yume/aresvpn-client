@@ -42,9 +42,19 @@ BRAND = re.compile(r"Amnezia|AMNEZIA|amnezia")
 #   1. qsTr("...") / tr("..." "..." "...")  - the whole argument, so every fragment is seen
 #   2. a text-ish QML property assigned a literal
 #   3. EVERY literal in a file that is nothing but a label table (LABEL_TABLES below)
+#
+# AND THE `+` FORM, added 2026-09-05 after it hid a string on a REACHABLE screen. C++ joins
+# adjacent literals with whitespace and the pattern below always allowed that; QML joins them with
+# `+`, and nothing here allowed THAT - so `qsTr("a " + "b " + "c")` was read as `"a "` and every
+# fragment after the first was invisible. `#D184`'s About notice is written in exactly that shape,
+# five fragments, and the mark it must carry for GPL-3 section 5 lives in fragment two. The file's
+# own header already recorded this class once - *a C++ adjacent-literal concatenation hides every
+# fragment after the first* - and the fix covered one of the two spellings (`#L009`: a call-site
+# regex is structurally incomplete, and knowing that did not make the second spelling visible).
 USER_STRING = re.compile(
-    r"(?:qsTr|tr)\s*\(\s*((?:\"(?:[^\"\\]|\\.)*\"\s*)+)"
-    r"|(?:text|headerText|descriptionText|title|placeholderText|textString)\s*:\s*(\"(?:[^\"\\]|\\.)*\")"
+    r"(?:qsTr|tr)\s*\(\s*((?:\"(?:[^\"\\]|\\.)*\"\s*(?:\+\s*)?)+)"
+    r"|(?:text|headerText|descriptionText|title|placeholderText|textString)\s*:\s*"
+    r"((?:\"(?:[^\"\\]|\\.)*\"\s*(?:\+\s*)?)+)"
 )
 
 ANY_LITERAL = re.compile(r"\"((?:[^\"\\]|\\.)*)\"")
@@ -114,7 +124,15 @@ DEAD_SURFACE_STRINGS = [
 
 # Every exception, one line each, with the reason. Matched on (file basename, substring).
 ALLOWED = [
-    ("PageSettingsAbout.qml", "marks of their owners",
+    # The needle was "marks of their owners" until 2026-09-05 and matched NOTHING, because #D184
+    # rebuilt this screen and the sentence now reads "are their marks". The checker did the right
+    # thing - it reported the notice as an unexplained mark on a reachable screen rather than
+    # letting a stale entry wave it through - and that red is what found this. A needle taken from
+    # prose goes stale whenever the prose is edited, which is why every ALLOWED entry must now
+    # MATCH SOMETHING or the run fails (see check_allowlist_is_live): an entry that matches nothing
+    # is either stale, like this one was, or the notice it protects has been deleted - and the
+    # second is a licence violation that would otherwise show up as a clean green.
+    ("PageSettingsAbout.qml", "are their marks",
      "the attribution notice itself - GPL-3 section 5 and #D178. Removing the mark HERE would be "
      "the licence violation, not the other way round."),
     ("containerUtils.cpp", "AresWG (AmneziaWG)",
@@ -180,17 +198,33 @@ def line_of(text, offset):
     return text.count("\n", 0, offset) + 1
 
 
-def allowed_reason(basename, string):
-    for f, needle, why in ALLOWED:
+def allowed_reason(basename, string, fired=None):
+    for i, (f, needle, why) in enumerate(ALLOWED):
         if basename == f and needle in string:
+            if fired is not None:
+                fired.add(i)
             return why
     return None
+
+
+def allowlist_is_live(fired):
+    """Every ALLOWED entry must match at least one site.
+
+    An allow-list entry that matches nothing has two possible causes and they are opposite: the
+    needle went stale (the prose was edited - which is what happened to the About notice when #D184
+    rebuilt that screen), or THE THING IT PROTECTS IS GONE. The second is the dangerous one: delete
+    the GPL-3 section 5 attribution and this checker would report a clean tree, because the string
+    it was told to permit is simply absent. A permission that cannot fire certifies nothing (#L020),
+    and here it would certify a licence violation as a pass.
+    """
+    return [(i, ALLOWED[i][0], ALLOWED[i][1]) for i in range(len(ALLOWED)) if i not in fired]
 
 
 def scan(root, roots=None, ignore_dead=False):
     reach, pages = reachable_pages(root, roots)
     failures, unreachable_hits, allowed_hits, dead_hits = [], [], [], []
     keys_skipped = []
+    allow_fired = set()
 
     # every page, plus the non-page sources that produce customer text
     targets = dict(pages)
@@ -216,7 +250,7 @@ def scan(root, roots=None, ignore_dead=False):
                 # Counted, not dropped - a silent skip is how a bucket total stops adding up.
                 keys_skipped.append((base, line_of(text, off), s[:96]))
                 continue
-            why = allowed_reason(base, s)
+            why = allowed_reason(base, s, allow_fired)
             row = (base, line_of(text, off), s[:96])
             if why:
                 allowed_hits.append(row + (why,))
@@ -233,11 +267,12 @@ def scan(root, roots=None, ignore_dead=False):
                 failures.append(row)
             else:
                 unreachable_hits.append(row)
-    return failures, unreachable_hits, allowed_hits, dead_hits, keys_skipped, reach, pages
+    return (failures, unreachable_hits, allowed_hits, dead_hits, keys_skipped, reach, pages,
+            allowlist_is_live(allow_fired))
 
 
 def run(root):
-    failures, unreachable, allowed, dead, keys, reach, pages = scan(root)
+    failures, unreachable, allowed, dead, keys, reach, pages, stale = scan(root)
 
     print("pages: %d total, %d reachable from %s" % (len(pages), len(reach), ", ".join(ROOTS)))
     if dead:
@@ -266,6 +301,12 @@ def run(root):
         print("\nFAIL - a REACHABLE screen carries the mark:")
         for base, line, s in failures:
             print("  %-42s :%-5d %s" % (base, line, s))
+    if stale:
+        print("\nFAIL - an ALLOWED entry matched NOTHING. It is stale, or the notice it permits")
+        print("has been DELETED - and the second is a licence violation this run would otherwise")
+        print("have reported as clean, because the string it was told to permit is simply absent:")
+        for i, base, needle in stale:
+            print("  ALLOWED[%d]  %-40s %r" % (i, base, needle))
     print("\n%d on a reachable customer screen, %d unreachable, %d dead surface, %d deliberate"
           " and %d container key(s) kept by #D180 rule 3"
           % (len(failures), len(unreachable), len(dead), len(allowed), len(keys)))
@@ -274,7 +315,7 @@ def run(root):
         print("FAIL the reachability walk found %d pages - that is a broken walker, not a clean "
               "tree" % len(reach))
         return 1
-    return 1 if failures else 0
+    return 1 if (failures or stale) else 0
 
 
 def run_selftest(root):
@@ -297,10 +338,22 @@ def run_selftest(root):
     # mention. A mention is not a route. Rather than weaken the walk or pretend, those files are
     # named in DEAD_SURFACE with the reason the mark stays on them (#L015: instrument first).
 
-    failures, unreachable, allowed, dead, keys, _r, _p = scan(root)
+    failures, unreachable, allowed, dead, keys, _r, _p, stale = scan(root)
     check("no customer-facing screen carries the mark today", failures == [])
     check("the deliberate uses are found and named", len(allowed) >= 3)
     check("the dead surface is reported rather than swept", len(dead) > 0)
+    check("every ALLOWED entry matches something - none is stale", stale == [])
+
+    # PLANT: a needle nobody wrote must be reported as stale. This is the arm that would have
+    # caught the About notice disappearing, and it is why the check exists at all - the real entry
+    # HAD gone stale, silently, and only the failure it caused revealed it (#L020).
+    ALLOWED.append(("PageSettingsAbout.qml", "a needle that matches nothing on purpose",
+                    "planted by the selftest"))
+    try:
+        _f3, _u3, _a3, _d3, _k3, _r3, _p3, stale3 = scan(root)
+        check("...and a planted needle that matches nothing IS reported", len(stale3) == 1)
+    finally:
+        ALLOWED.pop()
 
     # CONSERVATION. Every brand string the scanner sees must land in exactly one bucket. Without
     # this, a category added later could silently swallow strings and the headline would read 0
@@ -323,7 +376,7 @@ def run_selftest(root):
 
     # PLANT ONE: with the dead-surface exemption switched off, those same strings MUST fail.
     # That is what proves the check can fail at all rather than exempting its way to green.
-    f2, _u2, _a2, _d2, _k2, _r2, _p2 = scan(root, ignore_dead=True)
+    f2, _u2, _a2, _d2, _k2, _r2, _p2, _s2 = scan(root, ignore_dead=True)
     check("...and with the exemption off the very same strings FAIL, so it is not blind",
           len(f2) > len(failures))
 

@@ -330,6 +330,44 @@ elseif(ARES_RELEASE)
                         "cannot be produced and this release build must not proceed.")
 endif()
 
+# ===========================================================================================
+# DOES A SCREEN A CUSTOMER CAN REACH STILL CARRY AMNEZIA'S MARK? (AresProject #D190, 18-3b)
+#
+# `cmake/aresvpn/brand-check.py` has answered that since 18-3b and NOTHING RAN IT. It was a
+# command to remember, and on 2026-09-04 `#D184` rebuilt the About screen, the notice's wording
+# changed from "marks of their owners" to "are their marks", and the allow-list entry protecting
+# that notice silently stopped matching. Nobody knew for a day. `#L013`'s update is the rule this
+# repays: prefer a check that RUNS to a rule that must be read.
+#
+# Same authorisation shape as the source revisions above: a warning on an ordinary build, FATAL
+# under `-DARES_RELEASE=ON`, because a build nobody conveys carrying a mark on a dead screen is a
+# defect to fix and not a reason to stop working.
+find_program(_ares_brand_python NAMES python3 python py)
+set(_ares_brand_script "${CMAKE_SOURCE_DIR}/cmake/aresvpn/brand-check.py")
+if(_ares_brand_python AND EXISTS "${_ares_brand_script}")
+    execute_process(
+        COMMAND "${_ares_brand_python}" "${_ares_brand_script}" --root "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE _ares_brand_rc
+        OUTPUT_VARIABLE _ares_brand_out
+        ERROR_VARIABLE _ares_brand_err
+    )
+    if(NOT _ares_brand_rc EQUAL 0)
+        if(ARES_RELEASE)
+            message(FATAL_ERROR
+                "AresVPN brand check: a screen a customer can REACH carries Amnezia's mark, or an "
+                "entry in the deliberate-exceptions list matches nothing (which means it went "
+                "stale, or the notice it permits has been deleted).\n${_ares_brand_out}${_ares_brand_err}")
+        else()
+            message(WARNING
+                "AresVPN brand check: NOT clean. This build may not be conveyed. Re-run with "
+                "-DARES_RELEASE=ON to make this fatal.\n${_ares_brand_out}${_ares_brand_err}")
+        endif()
+    endif()
+elseif(ARES_RELEASE)
+    message(FATAL_ERROR "AresVPN brand check: no python, so a release build cannot establish that "
+                        "no reachable screen carries Amnezia's mark.")
+endif()
+
 if(APPLE)
     set(RUNTIME_DEPS_DIR ${CMAKE_INSTALL_BINDIR}/AmneziaVPN.app/Contents/Frameworks)
 else()

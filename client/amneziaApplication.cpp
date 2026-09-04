@@ -595,6 +595,7 @@ void AmneziaApplication::init()
         };
         QObject *serversUi = contextObject("ServersUiController");
         QObject *settingsUi = contextObject("SettingsController");
+        QObject *aresProfile = contextObject("AresProfileController");
         if (!serversUi || !settingsUi) {
             out << "QML-DRIVE BROKEN: a context controller is missing" << Qt::endl;
             ::exit(3);
@@ -605,11 +606,16 @@ void AmneziaApplication::init()
             return value;
         };
         const bool hasRent = !serversUi->property("defaultServerId").toString().isEmpty();
+        // WHAT THE BRANCH IS, and it changed with #D187: a SESSION, not a stored rent. The two
+        // coincide only by accident, and the walkthrough asserting the wrong one is how a correct
+        // build reads as red.
+        const bool signedIn = aresProfile && aresProfile->property("hasSession").toBool();
         out << "QML-DRIVE starting on " << drive.currentPage()
-            << (hasRent ? " (a rent is stored)" : " (no rent stored)") << Qt::endl;
+            << (signedIn ? " (signed in)" : " (not signed in)")
+            << (hasRent ? ", a rent is stored" : ", no rent stored") << Qt::endl;
         drive.shot(QStringLiteral("start"));
 
-        if (hasRent) {
+        if (signedIn) {
             // #D182 rule 2: a rent stored means the home screen, and Rents is a SECOND screen the
             // customer visits when they want to - never a step on the way to connecting.
             drive.expectPage(QStringLiteral("page:PageHome"));
@@ -626,8 +632,8 @@ void AmneziaApplication::init()
             drive.expectPage(QStringLiteral("page:PageHome"));
 
             drive.clickTo(QStringLiteral("home.rents"), QStringLiteral("page:PageAresSession"));
-            drive.reportTruncated(QStringLiteral("the rent list"));
-            drive.shot(QStringLiteral("rents"));
+            drive.reportTruncated(QStringLiteral("the session screen"));
+            drive.shot(QStringLiteral("session"));
 
             // THE LAST DISCRIMINATOR. Navigation FROM the startup page works every time and
             // clicks ON a pushed page never do. If PageHome is still VISIBLE while the rent list
@@ -637,26 +643,34 @@ void AmneziaApplication::init()
             // are the product's, which is a very different answer.
             drive.expectExists(QStringLiteral("home.connect"), false);
 
-            // The destructive path, as far as the confirmation and no further. The dialog is
-            // MODAL, so the run must dismiss it before anything else - the first version did not,
-            // and every later step failed against a screen the customer could not have left
-            // either. That the failures were real is the point: the dialog does block.
-            if (drive.click(QStringLiteral("rents.trash1"))) {
-                drive.shot(QStringLiteral("remove-confirm"));
-                drive.expectExists(QStringLiteral("rents.removeConfirm"));
-                drive.click(QStringLiteral("rents.removeKeep"));
-                drive.expectExists(QStringLiteral("rents.removeConfirm"), false);
-                drive.expectExists(QStringLiteral("rents.trash1"));
+            // The destructive path, as far as the confirmation and no further. Signing out is
+            // the session's destructive act now - there is no per-rent delete, because there is no
+            // list. The dialog is MODAL, so the run must dismiss it before anything else.
+            if (drive.click(QStringLiteral("session.signout"))) {
+                drive.shot(QStringLiteral("signout-confirm"));
+                drive.expectExists(QStringLiteral("session.signOutConfirm"));
+                drive.click(QStringLiteral("session.signOutKeep"));
+                drive.expectExists(QStringLiteral("session.signOutConfirm"), false);
+                // AND THE SESSION MUST STILL BE THERE. `Stay signed in` that signs you out anyway
+                // is the defect this step exists to catch, and it is invisible in a screenshot.
+                drive.expectExists(QStringLiteral("session.signout"));
             }
 
-            drive.clickTo(QStringLiteral("rents.add"), QStringLiteral("page:PageSetupWizardAresLogin"));
+            drive.clickTo(QStringLiteral("session.switch"), QStringLiteral("page:PageSetupWizardAresLogin"));
             drive.reportTruncated(QStringLiteral("the login"));
             drive.type(QStringLiteral("login.id"), QStringLiteral("driver"));
             drive.type(QStringLiteral("login.idx"), QStringLiteral("odin_1"));
             drive.shot(QStringLiteral("login-typed"));
         } else {
-            // #D182 rule 1: with no rent stored the LOGIN is the first screen.
+            // #D187 rule 1, superseding #D182's: NOT SIGNED IN means the login is the first
+            // screen - whether or not a rent happens to be stored from some earlier path. That
+            // distinction is the whole correction, so the walkthrough states it rather than
+            // implying it.
             drive.expectPage(QStringLiteral("page:PageSetupWizardAresLogin"));
+            drive.reportTruncated(QStringLiteral("the first-run login"));
+            drive.expectExists(QStringLiteral("login.submit"));
+            drive.type(QStringLiteral("login.id"), QStringLiteral("driver"));
+            drive.type(QStringLiteral("login.idx"), QStringLiteral("odin_1"));
             drive.shot(QStringLiteral("first-run-login"));
         }
 

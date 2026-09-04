@@ -23,7 +23,7 @@ SystemTrayNotificationHandler::SystemTrayNotificationHandler(QObject* parent) :
     , m_systemTrayIcon(parent)
 #endif
 {
-    m_trayActionShow =  m_menu.addAction(QIcon(":/images/tray/application.png"), tr("Show") + " " + APPLICATION_NAME, this, [this](){
+    m_trayActionShow =  m_menu.addAction(tr("Show") + " " + APPLICATION_NAME, this, [this](){
         emit raiseRequested();
     });
     m_menu.addSeparator();
@@ -32,13 +32,16 @@ SystemTrayNotificationHandler::SystemTrayNotificationHandler(QObject* parent) :
 
     m_menu.addSeparator();
 
-    m_trayActionVisitWebSite = m_menu.addAction(QIcon(":/images/tray/link.png"), tr("Visit Website"), [&](){
+    m_trayActionVisitWebSite = m_menu.addAction(tr("Visit Website"), [&](){
         QDesktopServices::openUrl(QUrl(websiteUrl));
     });
 
     // Quit action: disconnect VPN first on macOS NE, else quit directly
-    m_trayActionQuit = m_menu.addAction(QIcon(":/images/tray/cancel.png"),
-                                       tr("Quit") + " " + APPLICATION_NAME,
+    // The three menu images upstream names - tray/application.png, tray/link.png,
+    // tray/cancel.png - are in neither the resource file nor the tree. A QIcon built from a
+    // missing resource is silently empty, so the actions lost their pictures and nothing said so.
+    // Naming a file that is not there reads as intent; asking for no icon is honest.
+    m_trayActionQuit = m_menu.addAction(tr("Quit") + " " + APPLICATION_NAME,
                                        this,
                                        [&](){ qApp->quit(); });
 
@@ -49,12 +52,20 @@ SystemTrayNotificationHandler::SystemTrayNotificationHandler(QObject* parent) :
     m_statusIcon = new MacOSStatusIcon(this);
     m_statusIcon->setMenu(&m_menu);
 #else
-    m_systemTrayIcon.show();
     connect(&m_systemTrayIcon, &QSystemTrayIcon::activated, this,
             &SystemTrayNotificationHandler::onTrayActivated);
     m_systemTrayIcon.setContextMenu(&m_menu);
 #endif
+    // THE ICON IS SET BEFORE THE TRAY ITEM IS SHOWN. It used to be the other way round, and Qt
+    // says so on every launch: `QSystemTrayIcon::setVisible: No Icon set`. That line was in every
+    // harness capture for two sessions and I read past it as noise, until the operator hit the
+    // consequence - *따로 GUI켜져있는게 보이는게 없었는데 프로세스에는 남아있었네*. Closing the
+    // window leaves the app running in a tray it never drew, so there is no window to raise, no
+    // menu to quit from, and nothing on screen to say the program is still there.
     setTrayState(Vpn::ConnectionState::Disconnected);
+#ifndef Q_OS_MAC
+    m_systemTrayIcon.show();
+#endif
 }
 
 SystemTrayNotificationHandler::~SystemTrayNotificationHandler() {
@@ -89,9 +100,12 @@ void SystemTrayNotificationHandler::setTrayIcon(const QString &iconPath)
 #ifdef Q_OS_MAC
     m_statusIcon->setIcon(iconPath);
 #else
-    QIcon trayIconMask(QPixmap(iconPath).scaled(128,128));
-    trayIconMask.setIsMask(true);
-    m_systemTrayIcon.setIcon(trayIconMask);
+    // AND NOT AS A MASK. `QIcon::setIsMask` is macOS's template-image idea - the system recolours
+    // a silhouette to match the menu bar - and upstream applies it in the NOT-macOS branch, where
+    // it does the opposite of the intent: Windows renders the icon as a flat silhouette of its
+    // alpha channel, which for this mark is a shape that disappears against half the taskbar
+    // themes. The image is used as it is.
+    m_systemTrayIcon.setIcon(QIcon(iconPath));
 #endif
 }
 

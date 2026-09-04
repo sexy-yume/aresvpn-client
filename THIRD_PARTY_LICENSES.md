@@ -57,7 +57,7 @@ these after it).
 | amnezia-libxray 1.0.3 (`libxray.aar`, Xray-core + `sagernet/sing*`) | MPL-2.0 + GPL-3.0-or-later, a GPL-3.0 combined work | in the APK | **wrapper licence and module graph not yet read** |
 | openvpn-pt-android (`libovpn3.so`, `libovpnutil.so`, `librsapss.so`) - OpenVPN 3 core | AGPL-3.0 | in the APK | GPL-3.0-compatible under GPL-3 section 13; the recipe pins a branch, so the shipped revision must be recorded at release |
 | OpenVPN 3 SWIG Java bindings (29 files, `net.openvpn.ovpn3`) | AGPL-3.0 | in the APK | |
-| Cloak plugin (`libck-ovpn-plugin.so`) | GPL-3.0 | in the APK, loaded by nothing | scheduled for removal |
+| Cloak plugin (`libck-ovpn-plugin.so`) | GPL-3.0 | in the APK, and REQUIRED: `readelf -d libovpn3.so` shows a `NEEDED` on it, so the OpenVPN 3 core we ship will not load without it | shipped dependency; the earlier note said *loaded by nothing, scheduled for removal* and that was measured wrong - it is not loaded by Kotlin, and it is linked by the ELF |
 | Google ML Kit barcode-scanning 17.3.0 | Google proprietary - **not GPL-compatible** | in both flavours today | **must be replaced or removed before any Android binary is distributed** |
 | androidx.*, kotlinx-coroutines, kotlinx-serialization | Apache-2.0 | | |
 | Go runtime, inside `libxray.aar`, `libwg-go.so`, `libck-ovpn-plugin.so` | BSD-3-Clause | | per-artefact module notices to be generated |

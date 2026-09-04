@@ -57,25 +57,34 @@ file(COPY ${AMNEZIA_LIBXRAY_PATH} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/androi
 
 find_package(openvpn-pt-android REQUIRED)
 set(LIBS ${LIBS} amnezia::openvpn-pt-android)
-# AresVPN Client (AresProject #D192, ROADMAP 18-3e): THE CLOAK PLUGIN IS NOT PACKAGED.
+# AresVPN Client (AresProject #D192, ROADMAP 18-3e): DO NOT REMOVE THIS LINE. The Cloak plugin is
+# a RUNTIME DEPENDENCY of the OpenVPN core we ship, and every source in this repository says
+# otherwise.
 #
-# `libck-ovpn-plugin.so` is 7 424 088 B of GPL-3 Go inside every APK and **nothing loads it**.
-# Measured here rather than taken from survey 7.5 (#L004): the only references in the whole tree
-# are this line, the recipe target that builds it, and the licence list. Upstream's own MVVM
-# refactor deleted `Cloak.kt` in 847bb692; the one remaining hook,
-# `OpenVpn.kt::configPluggableTransport`, is overridden nowhere; and the C++ side has RETIRED the
-# container - `ContainerUtils::isUnsupportedContainer` returns true for `DockerContainer::Cloak`
-# and `connectionController.cpp` refuses it with `LegacyContainerNotSupportedError`.
+# The standing claim - survey 7.5, `THIRD_PARTY_LICENSES.md`, and ROADMAP 18-3e's own open list -
+# is that `libck-ovpn-plugin.so` is 7 424 088 B of GPL-3 Go that **nothing loads**, and it is
+# well-argued: upstream's MVVM refactor deleted `Cloak.kt` (847bb692), the one remaining hook
+# `OpenVpn.kt::configPluggableTransport` is overridden nowhere, `ContainerUtils::isUnsupportedContainer`
+# returns true for `DockerContainer::Cloak`, and `connectionController.cpp` refuses it with
+# `LegacyContainerNotSupportedError`. Every one of those is true. All of them are about the KOTLIN
+# loader, and the plugin is not loaded by Kotlin.
 #
-# So this conveys a GPL-3 binary that cannot be reached, which is a Corresponding Source duty taken
-# on for nothing (#D177's rule 3 argument runs the other way here: the cheapest thing to track is
-# the thing you do not ship). The recipe still BUILDS it - not packaging is the whole change, which
-# keeps the conan graph and every package_id identical - and the option is the fork's, defaulting
-# OFF, so upstream's line survives one `if` deep for a cheap merge.
-option(ARES_SHIP_CLOAK_PLUGIN "Package Cloak's OpenVPN plugin (7.4 MB of GPL-3 that nothing loads)" OFF)
-if(ARES_SHIP_CLOAK_PLUGIN)
-    set_property(TARGET ${PROJECT} APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${OPENVPN_PT_ANDROID_LIBCK_OVPN_PLUGIN_PATH})
-endif()
+#     readelf -d lib/arm64-v8a/libovpn3.so   ->   NEEDED   libck-ovpn-plugin.so
+#
+# `libovpn3.so` IS the OpenVPN 3 core this product runs on Android. Remove the plugin and it fails
+# to load, which takes OpenVPN out of the APK entirely - and it would have looked like a clean 7 MB
+# saving right up to the first customer who chose that protocol.
+#
+# HOW IT WAS FOUND, because the method is the point: gating this line changed the APK by ZERO bytes,
+# the plugin was still at `lib/arm64-v8a/libck-ovpn-plugin.so`, and asking what else could put it
+# there ended at the ELF rather than at a fourth theory (#L010). `androiddeployqt`'s dependency walk
+# had been pulling it in all along, correctly. A grep for a loader answers "who calls it"; only the
+# dynamic section answers "what needs it" (#L004: an inference is not a measurement, and four
+# careful readings agreed with each other).
+#
+# So the GPL-3 duty is real and stays: this component IS conveyed, deliberately, and belongs in the
+# notice as a shipped dependency rather than as something scheduled for removal.
+set_property(TARGET ${PROJECT} APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${OPENVPN_PT_ANDROID_LIBCK_OVPN_PLUGIN_PATH})
 # !!! THIS IS NOT ENOUGH, AND THE APK SAYS SO. Measured after the change, on the branded artefact
 # (#L019 - the commit that made it promised this check and it is why the gap is known):
 #

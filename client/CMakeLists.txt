@@ -248,6 +248,22 @@ install(TARGETS ${PROJECT}
     COMPONENT AresVPNClient
 )
 
+# AresVPN Client (AresProject ROADMAP 18-3d): the licence texts ship WITH the binary. Nothing
+# installed them before, so an installed tree carried a GPL-3 application and not one word of its
+# licence, no third-party attribution, and neither of the two texts we are separately obliged to
+# reproduce: the OFL for PT Root UI (#D180 rule 4 - an OFL.txt beside the font is a duty, not a
+# courtesy) and the Wintun prebuilt-binaries EULA, which the recipe discards and which #D175
+# records as binding whatever OUR licence is. The written offer of Corresponding Source is the
+# repository, which the About screen already links.
+install(FILES
+    ${CMAKE_SOURCE_DIR}/LICENSE
+    ${CMAKE_SOURCE_DIR}/THIRD_PARTY_LICENSES.md
+    ${CMAKE_SOURCE_DIR}/licenses/wintun-prebuilt-binaries-license.txt
+    ${CMAKE_CURRENT_SOURCE_DIR}/fonts/OFL-PT-Root-UI.txt
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    COMPONENT AresVPNClient
+)
+
 if(APPLE)
     set(RUNTIME_DEPS_DIR ${CMAKE_INSTALL_BINDIR}/AmneziaVPN.app/Contents/Frameworks)
 else()

@@ -12,7 +12,14 @@ set(CPACK_PACKAGE_EXECUTABLES       AresVPNClient "AresVPN Client")
 set(CPACK_PRE_BUILD_SCRIPTS         ${CMAKE_CURRENT_LIST_DIR}/sign_binaries.cmake)
 set(CPACK_POST_BUILD_SCRIPTS        ${CMAKE_CURRENT_LIST_DIR}/sign_packages.cmake)
 set(CPACK_PROJECT_CONFIG_FILE       ${CMAKE_CURRENT_LIST_DIR}/CPackOptions.cmake)
-set(CPACK_RESOURCE_FILE_LICENSE     ${CMAKE_SOURCE_DIR}/deploy/data/LICENSE.txt)
+# AresVPN Client (AresProject ROADMAP 18-3d): this pointed at deploy/data/LICENSE.txt, which is a
+# git SYMLINK to ../../LICENSE - and a Windows checkout without symlink support stores it as the
+# literal 13-byte string "../../LICENSE". The installer's licence page would have shown that
+# string instead of the GPL, which is a GPL-3 presentation defect and looks like nothing at all.
+# Copied from the real LICENSE at configure time: one source of truth, a .txt for the installer,
+# and no symlink for a checkout to mangle.
+configure_file(${CMAKE_SOURCE_DIR}/LICENSE ${CMAKE_BINARY_DIR}/LICENSE.txt COPYONLY)
+set(CPACK_RESOURCE_FILE_LICENSE     ${CMAKE_BINARY_DIR}/LICENSE.txt)
 
 list(PREPEND CPACK_COMPONENTS_ALL AresVPNClient)
 

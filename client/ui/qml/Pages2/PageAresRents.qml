@@ -17,6 +17,7 @@ import "../Controls2/TextTypes"
 
 PageType {
     id: root
+    objectName: "page:PageAresRents"
 
     Rectangle {
         anchors.fill: parent
@@ -161,6 +162,7 @@ PageType {
 
                     // remove
                     ImageButtonType {
+                        objectName: "rents.trash" + index
                         image: "qrc:/images/controls/trash.svg"
                         imageColor: AresStyle.color.textMute
                         implicitWidth: 28
@@ -181,6 +183,7 @@ PageType {
 
                 MouseArea {
                     id: rowArea
+                    objectName: "rents.row" + index
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -220,6 +223,7 @@ PageType {
             Layout.topMargin: AresStyle.space.md
             Layout.bottomMargin: AresStyle.space.xl + PageController.safeAreaBottomMargin
 
+            objectName: "rents.add"
             text: qsTr("Add a rent")
             defaultColor: AresStyle.color.accent
             textColor: AresStyle.color.accentForeground
@@ -280,6 +284,7 @@ PageType {
                 BasicButtonType {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 44
+                    objectName: "rents.removeKeep"
                     text: qsTr("Keep")
                     defaultColor: AresStyle.color.transparent
                     textColor: AresStyle.color.text
@@ -291,6 +296,7 @@ PageType {
                 BasicButtonType {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 44
+                    objectName: "rents.removeConfirm"
                     text: qsTr("Remove")
                     defaultColor: AresStyle.color.bad
                     textColor: AresStyle.color.text

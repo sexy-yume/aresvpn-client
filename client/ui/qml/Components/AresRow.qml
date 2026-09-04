@@ -96,6 +96,7 @@ Rectangle {
 
     MouseArea {
         id: area
+        objectName: root.objectName === "" ? "" : root.objectName + ".area"
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor

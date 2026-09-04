@@ -29,6 +29,7 @@
 #include "ui/controllers/qml/pageController.h"
 #include "ui/models/installedAppsModel.h"
 #include "ui/utils/mtProxyPublicHostInput.h"
+#include "ui/utils/qmlDriver.h"
 #include "version.h"
 #include "core/utils/appUiConfig.h"
 
@@ -51,7 +52,8 @@ AmneziaApplication::AmneziaApplication(int &argc, char *argv[]) : AMNEZIA_BASE_C
       m_optImport   ({QStringLiteral("import")}, QStringLiteral("Import configuration from data string"), QStringLiteral("data")),
       m_optAresLogin({QStringLiteral("ares-login")}, QStringLiteral("AresVPN Client: read id, password and idx as three lines from stdin, store the rent, exit")),
       m_optQmlSmoke ({QStringLiteral("qml-smoke")}, QStringLiteral("AresVPN Client: compile every page in PageEnum, print any QML error, exit 4 if any failed")),
-      m_optQmlShot  ({QStringLiteral("qml-shot")}, QStringLiteral("AresVPN Client: navigate to each named page and write a PNG of the window into <dir>, then exit"), QStringLiteral("dir"))
+      m_optQmlShot  ({QStringLiteral("qml-shot")}, QStringLiteral("AresVPN Client: navigate to each named page and write a PNG of the window into <dir>, then exit"), QStringLiteral("dir")),
+      m_optQmlDrive ({QStringLiteral("qml-drive")}, QStringLiteral("AresVPN Client: click through the #D182 walkthrough, writing a PNG per step into <dir>, then exit"), QStringLiteral("dir"))
 {
     setDesktopFileName(QStringLiteral(APPLICATION_NAME));
     setQuitOnLastWindowClosed(false);
@@ -349,6 +351,123 @@ void AmneziaApplication::init()
         ::exit(blank ? 5 : 0);
     }
 
+    if (m_parser.isSet(m_optQmlDrive)) {
+        // AresVPN Client (AresProject ROADMAP 18-3h). Rendering a screen says it DRAWS; it does
+        // not say a customer can get anywhere. This presses the controls, in the real shell, and
+        // asserts where each press lands - #D182's two rules walked rather than read.
+        //
+        // Events are POSTED to our own window inside our own offscreen process. That is the
+        // distinction #L053 turns on: host-global injection carries no window handle and lands
+        // wherever focus is, which is how the operator's terminal received my typing. Nothing
+        // here is shared with anybody.
+        QTextStream out(stdout);
+        QQuickWindow *window = nullptr;
+        const QList<QObject *> roots = m_engine->rootObjects();
+        for (QObject *o : roots) {
+            if (auto *w = qobject_cast<QQuickWindow *>(o)) {
+                window = w;
+                break;
+            }
+        }
+        if (!window) {
+            out << "QML-DRIVE BROKEN: no QQuickWindow" << Qt::endl;
+            ::exit(3);
+        }
+        window->resize(420, 780);
+        window->show();
+
+        QmlDriver drive(window, m_parser.value(m_optQmlDrive));
+        drive.settle(20);
+
+        // Read the controllers through the QML CONTEXT rather than through CoreController's
+        // accessors: those are protected, and widening an upstream header for a test hook is a
+        // merge cost for nothing (#D177 rule 3). The context property is the same object the QML
+        // binds to, which is also the object a customer's click reaches.
+        auto contextObject = [this](const char *name) -> QObject * {
+            return qvariant_cast<QObject *>(m_engine->rootContext()->contextProperty(QString::fromLatin1(name)));
+        };
+        QObject *serversUi = contextObject("ServersUiController");
+        QObject *settingsUi = contextObject("SettingsController");
+        if (!serversUi || !settingsUi) {
+            out << "QML-DRIVE BROKEN: a context controller is missing" << Qt::endl;
+            ::exit(3);
+        }
+        auto autoConnectEnabled = [settingsUi]() -> bool {
+            bool value = false;
+            QMetaObject::invokeMethod(settingsUi, "isAutoConnectEnabled", Q_RETURN_ARG(bool, value));
+            return value;
+        };
+        const bool hasRent = !serversUi->property("defaultServerId").toString().isEmpty();
+        out << "QML-DRIVE starting on " << drive.currentPage()
+            << (hasRent ? " (a rent is stored)" : " (no rent stored)") << Qt::endl;
+        drive.shot(QStringLiteral("start"));
+
+        if (hasRent) {
+            // #D182 rule 2: a rent stored means the home screen, and Rents is a SECOND screen the
+            // customer visits when they want to - never a step on the way to connecting.
+            drive.expectPage(QStringLiteral("page:PageHome"));
+            drive.expectExists(QStringLiteral("home.connect"));
+            drive.click(QStringLiteral("home.rents"));
+            drive.expectPage(QStringLiteral("page:PageAresRents"));
+            drive.shot(QStringLiteral("rents"));
+
+            // The destructive path, as far as the confirmation and no further. The dialog is
+            // MODAL, so the run must dismiss it before anything else - the first version did not,
+            // and every later step failed against a screen the customer could not have left
+            // either. That the failures were real is the point: the dialog does block.
+            if (drive.click(QStringLiteral("rents.trash1"))) {
+                drive.shot(QStringLiteral("remove-confirm"));
+                drive.expectExists(QStringLiteral("rents.removeConfirm"));
+                drive.click(QStringLiteral("rents.removeKeep"));
+                drive.expectExists(QStringLiteral("rents.removeConfirm"), false);
+                drive.expectExists(QStringLiteral("rents.trash1"));
+            }
+
+            drive.click(QStringLiteral("rents.add"));
+            drive.expectPage(QStringLiteral("page:PageSetupWizardAresLogin"));
+            drive.type(QStringLiteral("login.id"), QStringLiteral("driver"));
+            drive.type(QStringLiteral("login.idx"), QStringLiteral("odin_1"));
+            drive.shot(QStringLiteral("login-typed"));
+        } else {
+            // #D182 rule 1: with no rent stored the LOGIN is the first screen.
+            drive.expectPage(QStringLiteral("page:PageSetupWizardAresLogin"));
+            drive.shot(QStringLiteral("first-run-login"));
+        }
+
+        // Settings, and each of the three groups it offers
+        m_coreController->pageController()->goToPage(PageLoader::PageEnum::PageSettings, false);
+        drive.settle(16);
+        drive.expectPage(QStringLiteral("page:PageSettings"));
+        drive.shot(QStringLiteral("settings"));
+        drive.click(QStringLiteral("settings.group1"));
+        drive.expectPage(QStringLiteral("page:PageSettingsConnection"));
+        drive.shot(QStringLiteral("settings-connection"));
+
+        m_coreController->pageController()->goToPage(PageLoader::PageEnum::PageSettingsApplication, false);
+        drive.settle(16);
+        drive.expectPage(QStringLiteral("page:PageSettingsApplication"));
+        // flip a switch and put it back, so the run leaves the settings as it found them (#L023)
+        const bool before = autoConnectEnabled();
+        drive.click(QStringLiteral("app.autoconnect.area"));
+        const bool after = autoConnectEnabled();
+        if (after == before) {
+            out << "  FAIL toggling app.autoconnect changed nothing (still "
+                << (before ? "on" : "off") << ")" << Qt::endl;
+        } else {
+            out << "  ok   app.autoconnect toggled " << (before ? "on->off" : "off->on") << Qt::endl;
+        }
+        drive.click(QStringLiteral("app.autoconnect.area"));
+        const bool restored = autoConnectEnabled();
+        out << (restored == before ? "  ok   app.autoconnect restored to what it was"
+                                   : "  FAIL app.autoconnect was NOT restored") << Qt::endl;
+        drive.shot(QStringLiteral("settings-application"));
+
+        const int extra = (after == before ? 1 : 0) + (restored == before ? 0 : 1);
+        out << "QML-DRIVE " << drive.steps() << " step(s), " << (drive.failures() + extra)
+            << " failed" << Qt::endl;
+        ::exit((drive.failures() + extra) ? 6 : 0);
+    }
+
     m_coreController->checkForAppUpdates();
 
 #ifdef Q_OS_WIN //TODO
@@ -461,6 +580,7 @@ bool AmneziaApplication::parseCommands()
     m_parser.addOption(m_optAresLogin);
     m_parser.addOption(m_optQmlSmoke);
     m_parser.addOption(m_optQmlShot);
+    m_parser.addOption(m_optQmlDrive);
     
     m_parser.process(*this);
 

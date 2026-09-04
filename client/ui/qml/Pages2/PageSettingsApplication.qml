@@ -30,6 +30,7 @@ import "../Config"
 
 PageType {
     id: root
+    objectName: "page:PageSettingsApplication"
 
     Rectangle {
         anchors.fill: parent
@@ -130,6 +131,7 @@ PageType {
                 }
 
                 AresRow {
+                    objectName: "app.autoconnect"
                     Layout.fillWidth: true
                     visible: !GC.isMobile()
                     toggleable: true
@@ -162,6 +164,7 @@ PageType {
                 }
 
                 AresRow {
+                    objectName: "app.logging"
                     Layout.fillWidth: true
                     title: qsTr("Logging")
                     subtitle: SettingsController.isLoggingEnabled ? qsTr("Enabled") : qsTr("Disabled")

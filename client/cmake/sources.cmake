@@ -57,6 +57,7 @@ set(HEADERS ${HEADERS}
     ${CLIENT_PAGE_ENUM_HEADER}
     ${CLIENT_ROOT_DIR}/ui/utils/qAutoStart.h
     ${CLIENT_ROOT_DIR}/ui/utils/mtProxyPublicHostInput.h
+    ${CLIENT_ROOT_DIR}/ui/utils/qmlDriver.h  # AresVPN Client: the --qml-drive walkthrough
     ${CLIENT_ROOT_DIR}/core/protocols/vpnProtocol.h
     ${CMAKE_CURRENT_BINARY_DIR}/version.h
     ${CLIENT_ROOT_DIR}/core/utils/selfhosted/sshClient.h
@@ -140,6 +141,7 @@ set(SOURCES ${SOURCES}
     ${CLIENT_ROOT_DIR}/core/repositories/secureAppSettingsRepository.cpp
     ${CLIENT_ROOT_DIR}/ui/utils/qAutoStart.cpp
     ${CLIENT_ROOT_DIR}/ui/utils/mtProxyPublicHostInput.cpp
+    ${CLIENT_ROOT_DIR}/ui/utils/qmlDriver.cpp  # AresVPN Client
     ${CLIENT_ROOT_DIR}/core/protocols/vpnProtocol.cpp
     ${CLIENT_ROOT_DIR}/core/utils/selfhosted/sshClient.cpp
     ${CLIENT_ROOT_DIR}/core/utils/networkUtilities.cpp

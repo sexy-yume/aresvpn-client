@@ -38,6 +38,7 @@ import "../Config"
 
 PageType {
     id: root
+    objectName: "page:PageSettings"
 
     Rectangle {
         anchors.fill: parent
@@ -79,6 +80,11 @@ PageType {
 
                 delegate: Rectangle {
                     required property var modelData
+                    // `required property var modelData` stops QML injecting `index`, so the
+                    // objectName below silently became "settings.groupundefined" and nothing
+                    // could find the row. Asking for it explicitly is the fix (found by driving
+                    // the UI - AresProject 18-3h).
+                    required property int index
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: 60
@@ -125,6 +131,7 @@ PageType {
 
                     MouseArea {
                         id: rowArea
+                        objectName: "settings.group" + index
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor

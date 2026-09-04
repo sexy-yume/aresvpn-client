@@ -27,6 +27,7 @@ import "../Config"
 
 PageType {
     id: root
+    objectName: "page:PageSettingsConnection"
 
     readonly property bool appSplitTunnelingAvailable: Qt.platform.os === "windows" || Qt.platform.os === "android"
 

@@ -21,6 +21,7 @@ import "../Controls2/TextTypes"
 
 PageType {
     id: root
+    objectName: "page:PageHome"
 
     readonly property bool connected: ConnectionController.isConnected
     readonly property bool busy: ConnectionController.isConnectionInProgress
@@ -63,6 +64,7 @@ PageType {
             Item { Layout.fillWidth: true }
 
             ImageButtonType {
+                objectName: "home.settings"
                 image: "qrc:/images/controls/settings.svg"
                 imageColor: AresStyle.color.textDim
                 implicitWidth: 34
@@ -221,6 +223,7 @@ PageType {
 
                 MouseArea {
                     id: rentsArea
+                    objectName: "home.rents"
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -229,6 +232,7 @@ PageType {
             }
 
             BasicButtonType {
+                objectName: "home.connect"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 52
 

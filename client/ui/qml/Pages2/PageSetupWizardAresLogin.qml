@@ -16,6 +16,7 @@ import "../Controls2/TextTypes"
 
 PageType {
     id: root
+    objectName: "page:PageSetupWizardAresLogin"
 
     // #D182: with no rent stored this page IS the first screen, so there is nowhere to go back
     // to and offering the control would be a dead end. Adding a rent from the list still pushes
@@ -73,6 +74,7 @@ PageType {
 
             TextFieldWithHeaderType {
                 id: idField
+                objectName: "login.id"
 
                 Layout.fillWidth: true
                 Layout.leftMargin: 16
@@ -86,6 +88,7 @@ PageType {
 
             TextFieldWithHeaderType {
                 id: pwField
+                objectName: "login.pw"
 
                 Layout.fillWidth: true
                 Layout.leftMargin: 16
@@ -99,6 +102,7 @@ PageType {
 
             TextFieldWithHeaderType {
                 id: idxField
+                objectName: "login.idx"
 
                 Layout.fillWidth: true
                 Layout.leftMargin: 16
@@ -129,6 +133,7 @@ PageType {
 
             BasicButtonType {
                 id: loginButton
+                objectName: "login.submit"
 
                 Layout.fillWidth: true
                 Layout.topMargin: 32

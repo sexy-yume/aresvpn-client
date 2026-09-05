@@ -155,3 +155,9 @@ deploy/aresvpn/generated/
 # after running one committed it once (CLAUDE.md section 5: account for every path).
 __pycache__/
 *.pyc
+
+# AresVPN Client: BUILT ARTEFACTS live here (AresProject #D193), beside the drivers that make
+# them, and are NEVER committed - the installer is ~109 MB and the APK ~70 MB, and a binary in git
+# history cannot be taken out again. They were landing in %LOCALAPPDATA%\Temp, which Windows
+# cleans, so "where is the build" had no durable answer.
+deploy/aresvpn/artifacts/

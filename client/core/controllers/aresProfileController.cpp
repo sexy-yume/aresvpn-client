@@ -4,6 +4,7 @@
 
 #include <QTimer>
 
+#include <QCryptographicHash>
 #include <QEventLoop>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -73,7 +74,7 @@ QString AresProfileController::deviceName()
     return name.left(64);
 }
 
-QString AresProfileController::identityMaterial(const QString &text)
+QString AresProfileController::identityDigest(const QString &text)
 {
     QStringList kept;
     const QStringList lines = text.split(QLatin1Char('\n'));
@@ -83,7 +84,10 @@ QString AresProfileController::identityMaterial(const QString &text)
             kept.append(trimmed);
         }
     }
-    return kept.join(QLatin1Char('\n')).trimmed();
+    // A digest, not the text: the text holds the device's private key, and this is persisted with
+    // the session, which is not one of SecureQSettings' encrypted keys.
+    return QString::fromLatin1(QCryptographicHash::hash(kept.join(QLatin1Char('\n')).trimmed().toUtf8(),
+                                                        QCryptographicHash::Sha256).toHex());
 }
 
 // A socks5 rent is a user name and a password against a listener on the rent's own public
@@ -265,7 +269,7 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
         result.message = tr("The console returned an empty configuration for this rent.");
         return result;
     }
-    result.material = identityMaterial(text);
+    result.identity = identityDigest(text);
 
     // (named `extracted`, not `imported` - that is the signal below)
     ImportController::ImportResult extracted = m_importController->extractConfigFromData(text, file.value(QStringLiteral("filename")).toString());
@@ -366,10 +370,11 @@ AresProfileController::Result AresProfileController::loginSession(const QString 
 
     adoptServer(r.serverId, previousServerId);
     if (m_appSettingsRepository) {
-        m_appSettingsRepository->setAresSession(id, password, idx, r.serverId);
+        m_appSettingsRepository->setAresSession(id, password, idx, r.serverId, r.deviceId, r.identity);
     }
-    m_sessionDeviceId = r.deviceId;
-    m_sessionMaterial = r.material;
+    // A first sign-in has no poll running yet (the UI controller starts it only for a session that
+    // already existed at launch, and a logout stops it), so start it here.
+    startSessionPolling();
     emit sessionChanged();
     return r;
 }
@@ -398,6 +403,8 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
     const QString pw = session.value(QStringLiteral("pw")).toString();
     const QString idx = session.value(QStringLiteral("idx")).toString();
     const QString previousServerId = session.value(QStringLiteral("serverId")).toString();
+    const QString previousDeviceId = session.value(QStringLiteral("deviceId")).toString();
+    const QString previousIdentity = session.value(QStringLiteral("identity")).toString();
 
     r = fetchAndImport(id, pw, idx);
     m_refreshing = false;
@@ -414,18 +421,17 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
 
     // The same rent can still hand this device a different identity (plan 24: its device was
     // removed and re-created, or its key re-minted). The tunnel must reconnect onto it too. A
-    // renewal is NOT one: it rewrites only the file's comment line, which `material` leaves out.
-    const bool baselineKnown = !m_sessionMaterial.isEmpty();
-    const bool identityChanged = baselineKnown
-            && (r.deviceId != m_sessionDeviceId || r.material != m_sessionMaterial);
-    m_sessionDeviceId = r.deviceId;
-    m_sessionMaterial = r.material;
+    // renewal is NOT one: it rewrites only the file's comment line, which `identity` leaves out.
+    // The baseline is persisted with the session, so this holds across a restart. A session with
+    // no stored identity (written by a client before plan 24, which sent no `device`) counts as
+    // changed once: its stored config is the rent's first device, not this installation's.
+    const bool identityChanged = r.deviceId != previousDeviceId || r.identity != previousIdentity;
 
     if (r.serverId != previousServerId || identityChanged) {
         // A DIFFERENT RENT, or this device's new identity on the same rent: adopt it (a no-op when
         // the server id is unchanged), and tell the UI so it reconnects onto what the customer has.
         adoptServer(r.serverId, previousServerId);
-        m_appSettingsRepository->setAresSession(id, pw, idx, r.serverId);
+        m_appSettingsRepository->setAresSession(id, pw, idx, r.serverId, r.deviceId, r.identity);
         if (changed) {
             *changed = true;
         }
@@ -446,8 +452,6 @@ void AresProfileController::logoutSession()
         m_appSettingsRepository->forgetRentExpiry(serverId);
         m_appSettingsRepository->clearAresSession();
     }
-    m_sessionDeviceId.clear();
-    m_sessionMaterial.clear();
     stopSessionPolling();
     emit sessionChanged();
 }

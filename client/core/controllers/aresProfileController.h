@@ -33,7 +33,7 @@ public:
         QString protocol;      // the rent's protocol as the server names it
         int rentId = 0;
         QString deviceId;      // the console's device_id for this installation; empty for a proxy rent
-        QString material;      // the importer's text without `#` comment lines; compared by refreshSession
+        QString identity;      // SHA-256 of the importer's text minus `#` comment lines; see identityDigest
     };
 
     explicit AresProfileController(ImportController *importController,
@@ -126,21 +126,16 @@ private:
     // product name where the host name says nothing (Android answers "localhost"). At most 64.
     static QString deviceName();
 
-    // What identifies this device's tunnel in a profile: the text minus its `#` comment lines. A
-    // renewal rewrites only the comment (`# ARES rent X device Y - expires ...`), so it is no change.
-    static QString identityMaterial(const QString &text);
+    // What identifies this device's tunnel in a profile: a digest of the text minus its `#` comment
+    // lines. A renewal rewrites only the comment (`# ARES rent X device Y - expires ...`), so it is
+    // no change. Persisted with the session, so refreshSession compares across restarts.
+    static QString identityDigest(const QString &text);
 
     ImportController *m_importController;
     SecureServersRepository *m_serversRepository;
     SecureAppSettingsRepository *m_appSettingsRepository;
     QTimer *m_pollTimer = nullptr;
     bool m_refreshing = false;
-    // What the live session was last imported from (plan 24): a changed device_id or material
-    // under the same server id is a change the tunnel must reconnect onto. In memory only - after
-    // a restart the first refresh sets the baseline, and the tunnel already starts from the
-    // stored, freshly imported config.
-    QString m_sessionDeviceId;
-    QString m_sessionMaterial;
 };
 
 #endif // ARESPROFILECONTROLLER_H

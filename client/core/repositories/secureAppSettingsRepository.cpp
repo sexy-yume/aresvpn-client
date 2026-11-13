@@ -330,13 +330,16 @@ QVariantMap SecureAppSettingsRepository::getAresSession() const
 }
 
 void SecureAppSettingsRepository::setAresSession(const QString &id, const QString &password,
-                                                 const QString &idx, const QString &serverId)
+                                                 const QString &idx, const QString &serverId,
+                                                 const QString &deviceId, const QString &identity)
 {
     QVariantMap map;
     map.insert(QStringLiteral("id"), id);
     map.insert(QStringLiteral("pw"), password);
     map.insert(QStringLiteral("idx"), idx);
     map.insert(QStringLiteral("serverId"), serverId);
+    map.insert(QStringLiteral("deviceId"), deviceId);
+    map.insert(QStringLiteral("identity"), identity);
     setValue("Conf/aresSession", map);
 }
 

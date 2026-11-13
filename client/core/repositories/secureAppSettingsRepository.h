@@ -88,12 +88,15 @@ public:
     // re-login leaves that finished feature half-working. This map lives in SecureQSettings, the
     // same encrypted store the configurations use; it never reaches a command line (#D030) or a log.
     //
-    // Keys: "id", "pw", "idx", "serverId". An empty map means NOT LOGGED IN, which is the branch
-    // the first screen reads - not "zero servers stored", which is what #D182 was implemented as
-    // and is a different question that only coincides by accident.
+    // Keys: "id", "pw", "idx", "serverId", and (plan 24) "deviceId" + "identity": the console's
+    // device id for this installation and the digest of the profile last imported for it, so a
+    // device re-created or re-keyed while the app was closed is still seen as changed after a
+    // restart. An empty map means NOT LOGGED IN, which is the branch the first screen reads - not
+    // "zero servers stored", which is what #D182 was implemented as and is a different question
+    // that only coincides by accident.
     QVariantMap getAresSession() const;
     void setAresSession(const QString &id, const QString &password, const QString &idx,
-                        const QString &serverId);
+                        const QString &serverId, const QString &deviceId, const QString &identity);
     void clearAresSession();
     void writeGatewayProxyUrls(const QString &cacheKey, const QByteArray &proxyUrlsEncrypted);
 

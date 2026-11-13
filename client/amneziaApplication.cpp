@@ -209,7 +209,8 @@ void AmneziaApplication::init()
         const AresProfileController::Result r = m_coreController->aresProfileController()->fetchAndImport(id, pw, idx);
         QTextStream out(stdout);
         if (r.errorCode == amnezia::ErrorCode::NoError) {
-            out << "ARES-LOGIN OK rent=" << r.rentId << " protocol=" << r.protocol << " server=" << r.serverId << Qt::endl;
+            out << "ARES-LOGIN OK rent=" << r.rentId << " protocol=" << r.protocol << " server=" << r.serverId
+                << " device=" << (r.deviceId.isEmpty() ? QStringLiteral("none") : r.deviceId) << Qt::endl;
             ::exit(0);
         }
         out << "ARES-LOGIN REFUSED code=" << static_cast<int>(r.errorCode) << " message=" << r.message << Qt::endl;

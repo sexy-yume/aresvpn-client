@@ -32,6 +32,8 @@ public:
         QString serverId;      // the stored server's id on success (deterministic per rent)
         QString protocol;      // the rent's protocol as the server names it
         int rentId = 0;
+        QString deviceId;      // the console's device_id for this installation; empty for a proxy rent
+        QString fileBody;      // the text handed to the importer; compared by refreshSession
     };
 
     explicit AresProfileController(ImportController *importController,
@@ -125,6 +127,12 @@ private:
     SecureAppSettingsRepository *m_appSettingsRepository;
     QTimer *m_pollTimer = nullptr;
     bool m_refreshing = false;
+    // What the live session was last imported from (plan 24): a changed device_id or file body
+    // under the same server id is a change the tunnel must reconnect onto. In memory only - after
+    // a restart the first refresh sets the baseline, and the tunnel already starts from the
+    // stored, freshly imported config.
+    QString m_sessionDeviceId;
+    QString m_sessionFileBody;
 };
 
 #endif // ARESPROFILECONTROLLER_H

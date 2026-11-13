@@ -12,6 +12,7 @@
 #include <QNetworkRequest>
 #include <QSslError>
 #include <QUrl>
+#include <QSysInfo>
 #include <QUuid>
 
 #include "amneziaApplication.h"
@@ -154,6 +155,12 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
     payload[QStringLiteral("id")] = login;
     payload[QStringLiteral("pw")] = password;
     payload[QStringLiteral("idx")] = alias;
+    // Plan 24: one rent, many devices. The installation's own key picks (or creates) this device's
+    // peer on the console, so two devices sharing a rent no longer knock each other off.
+    if (m_appSettingsRepository) {
+        payload[QStringLiteral("device")] = m_appSettingsRepository->getInstallationUuid(true);
+    }
+    payload[QStringLiteral("device_name")] = QSysInfo::machineHostName().trimmed().left(64);
     const Reply reply = post(endpoint() + QString::fromLatin1(kProfilePath), QJsonDocument(payload).toJson(QJsonDocument::Compact));
 
     if (reply.sslError) {
@@ -196,6 +203,9 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
 
     result.rentId = body.value(QStringLiteral("rent_id")).toInt();
     result.protocol = body.value(QStringLiteral("protocol")).toString();
+    // A number for tunnel rents, null for proxies; kept as text so null stays distinguishable.
+    const QJsonValue deviceId = body.value(QStringLiteral("device_id"));
+    result.deviceId = deviceId.isDouble() ? QString::number(deviceId.toVariant().toLongLong()) : QString();
     const QJsonObject file = body.value(QStringLiteral("file")).toObject();
     const QString fileBody = file.value(QStringLiteral("body")).toString();
     const QString uri = body.value(QStringLiteral("uri")).toString();
@@ -233,6 +243,7 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
         result.message = tr("The console returned an empty configuration for this rent.");
         return result;
     }
+    result.fileBody = text;
 
     // (named `extracted`, not `imported` - that is the signal below)
     ImportController::ImportResult extracted = m_importController->extractConfigFromData(text, file.value(QStringLiteral("filename")).toString());
@@ -335,6 +346,8 @@ AresProfileController::Result AresProfileController::loginSession(const QString 
     if (m_appSettingsRepository) {
         m_appSettingsRepository->setAresSession(id, password, idx, r.serverId);
     }
+    m_sessionDeviceId = r.deviceId;
+    m_sessionFileBody = r.fileBody;
     emit sessionChanged();
     return r;
 }
@@ -377,9 +390,17 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
         return r;
     }
 
-    if (r.serverId != previousServerId) {
-        // A DIFFERENT RENT, not merely a new address: the idx now points somewhere else. Adopt it,
-        // drop the old one, and tell the UI so it can reconnect onto what the customer actually has.
+    // The same rent can still hand this device a different identity (plan 24: its device was
+    // removed and re-created, or its file re-minted). The tunnel must reconnect onto it too.
+    const bool baselineKnown = !m_sessionFileBody.isEmpty();
+    const bool identityChanged = baselineKnown
+            && (r.deviceId != m_sessionDeviceId || r.fileBody != m_sessionFileBody);
+    m_sessionDeviceId = r.deviceId;
+    m_sessionFileBody = r.fileBody;
+
+    if (r.serverId != previousServerId || identityChanged) {
+        // A DIFFERENT RENT, or this device's new identity on the same rent: adopt it (a no-op when
+        // the server id is unchanged), and tell the UI so it reconnects onto what the customer has.
         adoptServer(r.serverId, previousServerId);
         m_appSettingsRepository->setAresSession(id, pw, idx, r.serverId);
         if (changed) {
@@ -402,6 +423,8 @@ void AresProfileController::logoutSession()
         m_appSettingsRepository->forgetRentExpiry(serverId);
         m_appSettingsRepository->clearAresSession();
     }
+    m_sessionDeviceId.clear();
+    m_sessionFileBody.clear();
     stopSessionPolling();
     emit sessionChanged();
 }

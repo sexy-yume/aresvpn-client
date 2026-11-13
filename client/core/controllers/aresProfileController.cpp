@@ -64,6 +64,28 @@ QString AresProfileController::serverIdForRent(int rentId)
     return QStringLiteral("ares-rent-%1").arg(rentId);
 }
 
+QString AresProfileController::deviceName()
+{
+    QString name = QSysInfo::machineHostName().trimmed();
+    if (name.isEmpty() || name.compare(QLatin1String("localhost"), Qt::CaseInsensitive) == 0) {
+        name = QSysInfo::prettyProductName().trimmed();
+    }
+    return name.left(64);
+}
+
+QString AresProfileController::identityMaterial(const QString &text)
+{
+    QStringList kept;
+    const QStringList lines = text.split(QLatin1Char('\n'));
+    for (const QString &line : lines) {
+        const QString trimmed = line.trimmed();
+        if (!trimmed.startsWith(QLatin1Char('#'))) {
+            kept.append(trimmed);
+        }
+    }
+    return kept.join(QLatin1Char('\n')).trimmed();
+}
+
 // A socks5 rent is a user name and a password against a listener on the rent's own public
 // address (AresProject #D050); the console hands it over as socks5h://user:pass@addr:port. The
 // reference client has no import branch for a socks5 upstream (survey 6.5), so the fork builds the
@@ -160,7 +182,7 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
     if (m_appSettingsRepository) {
         payload[QStringLiteral("device")] = m_appSettingsRepository->getInstallationUuid(true);
     }
-    payload[QStringLiteral("device_name")] = QSysInfo::machineHostName().trimmed().left(64);
+    payload[QStringLiteral("device_name")] = deviceName();
     const Reply reply = post(endpoint() + QString::fromLatin1(kProfilePath), QJsonDocument(payload).toJson(QJsonDocument::Compact));
 
     if (reply.sslError) {
@@ -243,7 +265,7 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
         result.message = tr("The console returned an empty configuration for this rent.");
         return result;
     }
-    result.fileBody = text;
+    result.material = identityMaterial(text);
 
     // (named `extracted`, not `imported` - that is the signal below)
     ImportController::ImportResult extracted = m_importController->extractConfigFromData(text, file.value(QStringLiteral("filename")).toString());
@@ -347,7 +369,7 @@ AresProfileController::Result AresProfileController::loginSession(const QString 
         m_appSettingsRepository->setAresSession(id, password, idx, r.serverId);
     }
     m_sessionDeviceId = r.deviceId;
-    m_sessionFileBody = r.fileBody;
+    m_sessionMaterial = r.material;
     emit sessionChanged();
     return r;
 }
@@ -391,12 +413,13 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
     }
 
     // The same rent can still hand this device a different identity (plan 24: its device was
-    // removed and re-created, or its file re-minted). The tunnel must reconnect onto it too.
-    const bool baselineKnown = !m_sessionFileBody.isEmpty();
+    // removed and re-created, or its key re-minted). The tunnel must reconnect onto it too. A
+    // renewal is NOT one: it rewrites only the file's comment line, which `material` leaves out.
+    const bool baselineKnown = !m_sessionMaterial.isEmpty();
     const bool identityChanged = baselineKnown
-            && (r.deviceId != m_sessionDeviceId || r.fileBody != m_sessionFileBody);
+            && (r.deviceId != m_sessionDeviceId || r.material != m_sessionMaterial);
     m_sessionDeviceId = r.deviceId;
-    m_sessionFileBody = r.fileBody;
+    m_sessionMaterial = r.material;
 
     if (r.serverId != previousServerId || identityChanged) {
         // A DIFFERENT RENT, or this device's new identity on the same rent: adopt it (a no-op when
@@ -424,7 +447,7 @@ void AresProfileController::logoutSession()
         m_appSettingsRepository->clearAresSession();
     }
     m_sessionDeviceId.clear();
-    m_sessionFileBody.clear();
+    m_sessionMaterial.clear();
     stopSessionPolling();
     emit sessionChanged();
 }

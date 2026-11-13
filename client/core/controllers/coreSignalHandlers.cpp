@@ -88,6 +88,7 @@ void CoreSignalHandlers::initAllHandlers()
     initIosSettingsHandler();
     initNotificationHandler();
     initUpdateFoundHandler();
+    initAresSessionReconnectHandler();
 }
 
 void CoreSignalHandlers::initErrorMessagesHandler()
@@ -466,5 +467,48 @@ void CoreSignalHandlers::initUpdateFoundHandler()
     connect(m_coreController->m_updateUiController, &UpdateUiController::updateFound, this, [this]() {
         emit m_coreController->m_pageController->goToPage(PageLoader::PageEnum::PageUpdate);
     });
+}
+
+// AresVPN Client (plan 24, D187 rule 6): the session's poll re-imports the profile when the idx
+// moves to another rent or this device gets a new identity on the same rent (deleted and re-created,
+// re-keyed). Storing the new config is not enough - the running tunnel still holds the dead key, and
+// WireGuard then stops handshaking with no error. So when the changed server is the one the tunnel
+// uses, close it and open it again once it reports Disconnected.
+void CoreSignalHandlers::initAresSessionReconnectHandler()
+{
+    connect(m_coreController->m_aresProfileController, &AresProfileController::sessionRentChanged, this,
+            [this](const QString &serverId, const QString &) {
+                ConnectionUiController *connection = m_coreController->m_connectionUiController;
+                if (serverId != m_coreController->m_serversController->getDefaultServerId()) {
+                    qDebug() << "ares session: identity changed for" << serverId << "- not the default server, no reconnect";
+                    return;
+                }
+                if (!connection->isConnected() && !connection->isConnectionInProgress()) {
+                    qDebug() << "ares session: identity changed for" << serverId << "- tunnel is down, nothing to reconnect";
+                    return;
+                }
+                qDebug() << "ares session: identity changed for" << serverId << "- reconnecting the tunnel";
+                m_aresReconnectPending = true;
+                connection->closeConnection();
+            });
+
+    connect(m_coreController->m_connectionController, &ConnectionController::connectionStateChanged, this,
+            [this](Vpn::ConnectionState state) {
+                if (!m_aresReconnectPending) {
+                    return;
+                }
+                if (state == Vpn::ConnectionState::Error) {
+                    // The close itself failed; leave the tunnel to the user rather than open over it.
+                    m_aresReconnectPending = false;
+                    qWarning() << "ares session: reconnect abandoned, closing the tunnel reported an error";
+                    return;
+                }
+                if (state != Vpn::ConnectionState::Disconnected) {
+                    return;
+                }
+                m_aresReconnectPending = false;
+                // Queued: open from a clean stack, not from inside the state change that closed it.
+                QTimer::singleShot(0, m_coreController->m_connectionUiController, &ConnectionUiController::openConnection);
+            });
 }
 

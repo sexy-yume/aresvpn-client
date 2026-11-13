@@ -41,8 +41,10 @@ private:
     void initIosSettingsHandler();
     void initNotificationHandler();
     void initUpdateFoundHandler();
+    void initAresSessionReconnectHandler();  // AresVPN Client (plan 24)
 
     CoreController* m_coreController;
+    bool m_aresReconnectPending = false;     // closed for an identity change; open on Disconnected
 };
 
 #endif // CORESIGNALHANDLERS_H

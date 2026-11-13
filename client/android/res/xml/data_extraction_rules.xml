@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
+    <!-- AresVPN Client (plan 24): files/settings is Qt's QSettings store and holds
+         Conf/installationUuid, the console's device key. It must never reach another phone. -->
     <cloud-backup>
         <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="settings" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="settings" />
     </device-transfer>
 </data-extraction-rules>

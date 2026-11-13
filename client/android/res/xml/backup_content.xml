@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <exclude domain="sharedpref" path="." />
+    <!-- AresVPN Client (plan 24): Qt keeps QSettings under files/settings on Android, and that file
+         holds Conf/installationUuid - the key the console registers this phone's device under. A
+         restored copy would make two phones one device, knocking each other off one rent. -->
+    <exclude domain="file" path="settings" />
 </full-backup-content>

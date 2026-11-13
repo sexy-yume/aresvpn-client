@@ -85,8 +85,10 @@ public:
     // (*비밀번호를 기기에 저장한다*, #L007). It is what lets the client re-ask `/api/profile` for its
     // `idx` without the customer, which is the whole of #D187 point 6: the server side already
     // re-assigns a rent when a slot's address is re-allocated, and downloading only on a manual
-    // re-login leaves that finished feature half-working. This map lives in SecureQSettings, the
-    // same encrypted store the configurations use; it never reaches a command line (#D030) or a log.
+    // re-login leaves that finished feature half-working. This map lives in SecureQSettings, but NOT
+    // among its encrypted keys (`secureQSettings.cpp`: only "Servers/serversList" is), so it is stored
+    // in plain text - which is why "identity" is a digest, never the profile; encrypting it is a plan 18
+    // cherry-pick. It never reaches a command line (#D030) or a log.
     //
     // Keys: "id", "pw", "idx", "serverId", and (plan 24) "deviceId" + "identity": the console's
     // device id for this installation and the digest of the profile last imported for it, so a

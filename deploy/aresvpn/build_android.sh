@@ -16,8 +16,10 @@
 # conflict for ever, and the seam that avoids one already exists - upstream added the branding
 # CLIENT_* variables themselves, and every one of them is read behind an `if(NOT CLIENT_...)`.
 #
-# NOTHING HERE MAY BE CONVEYED YET: the signing key its release build needs is a throwaway made by
-# the caller (plan 18 T03). ML Kit, which #D178 also barred, is gone (#D188).
+# WHAT MAY BE CONVEYED: only a RELEASE build (ARES_RELEASE=1, below) of the `oss` flavour, signed with
+# the one release key (AresProject #D287). AresProject's `scripts/client/android/build-android.sh`
+# forces ARES_RELEASE=1 whenever it is given that key. The `play` flavour links Play Billing and is
+# never conveyed (#D178). ML Kit, which #D178 also barred, is gone (#D188).
 #
 # ARES_RELEASE=1 configures a build meant to be conveyed: -DARES_RELEASE=ON makes the source-revision
 # and brand checks fatal and -DARES_HARNESS=OFF compiles the test harness out (audit 2026-11-14 H-19,

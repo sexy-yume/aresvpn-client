@@ -61,6 +61,18 @@
         <source>Disconnect</source>
         <translation>연결 끊기</translation>
     </message>
+    <message>
+        <source>This version is no longer supported. Install version %1 to connect again.</source>
+        <translation>이 버전은 더 이상 지원되지 않습니다. 다시 연결하려면 %1 버전을 설치하세요.</translation>
+    </message>
+    <message>
+        <source>Version %1 is available.</source>
+        <translation>%1 버전을 사용할 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Download</source>
+        <translation>다운로드</translation>
+    </message>
 </context>
 <context>
     <name>PageAresSession</name>
@@ -113,8 +125,8 @@
         <translation>%1 계정에서 로그아웃할까요?</translation>
     </message>
     <message>
-        <source>This device forgets your account and removes the rent it holds. The rent itself is not cancelled - sign in with the same idx to get it back.</source>
-        <translation>이 기기가 계정을 잊고 보관 중인 렌트를 삭제합니다. 렌트 자체가 해지되는 것은 아니며, 같은 idx로 다시 로그인하면 그대로 돌아옵니다.</translation>
+        <source>This device disconnects, forgets your account and removes the rent it holds. The rent itself is not cancelled - sign in with the same idx to get it back.</source>
+        <translation>이 기기는 연결을 끊고, 계정을 잊고, 보관 중인 렌트를 삭제합니다. 렌트 자체가 해지되는 것은 아니며, 같은 idx로 다시 로그인하면 그대로 돌아옵니다.</translation>
     </message>
     <message>
         <source>Stay signed in</source>
@@ -363,8 +375,8 @@ The same texts are installed beside the program&apos;s executable, and the compl
         <translation>이 렌트로 전환</translation>
     </message>
     <message>
-        <source>Signing in stores your account and this rent on this device, encrypted, so the app can follow your idx if the rent behind it changes. Your password goes to %1 over TLS.</source>
-        <translation>로그인하면 계정과 이 렌트가 이 기기에 암호화되어 저장됩니다. 그래야 idx 뒤의 렌트가 바뀔 때 앱이 따라갈 수 있습니다. 비밀번호는 TLS로 %1에 전송됩니다.</translation>
+        <source>Signing in stores your sign-in and this rent on this device, encrypted with a key held by the system keychain, so the app can follow your idx if the rent behind it changes. Your password goes to %1 over TLS.</source>
+        <translation>로그인하면 로그인 정보와 이 렌트가 시스템 키체인이 보관하는 키로 암호화되어 이 기기에 저장됩니다. 그래야 idx 뒤의 렌트가 바뀔 때 앱이 따라갈 수 있습니다. 비밀번호는 TLS로 %1에 전송됩니다.</translation>
     </message>
     <message>
         <source>Signed in - %1</source>
@@ -383,6 +395,100 @@ The same texts are installed beside the program&apos;s executable, and the compl
     <message>
         <source>The AresVPN background service is not running, so no tunnel can be opened. It is installed with the app and starts with Windows; if you are running a build directly, install it first or start the AresVPNClient-service process.</source>
         <translation>AresVPN 백그라운드 서비스가 실행 중이 아니어서 터널을 열 수 없습니다. 이 서비스는 앱과 함께 설치되어 Windows 시작 시 실행됩니다. 빌드를 직접 실행 중이라면 먼저 설치하거나 AresVPNClient-service 프로세스를 시작하세요.</translation>
+    </message>
+</context>
+<context>
+    <name>AresProfileUiController</name>
+    <!-- Plan 28: what the background refresh could not do, shown on the home screen. -->
+    <message>
+        <source>This device has to sign in again: the console no longer accepts the sign-in stored on it.</source>
+        <translation>이 기기는 다시 로그인해야 합니다. 콘솔이 이 기기에 저장된 로그인 정보를 더 이상 받지 않습니다.</translation>
+    </message>
+    <message>
+        <source>No rent carries idx %1 right now. The app keeps checking and takes the new one as soon as it is assigned.</source>
+        <translation>지금은 idx %1에 연결된 렌트가 없습니다. 앱이 계속 확인하며, 새 렌트가 배정되는 즉시 받아옵니다.</translation>
+    </message>
+</context>
+<context>
+    <name>AresProfileController</name>
+    <!-- Plan 28: the sign-in and refresh messages, chosen by HTTP status. The console's own
+         sentence is English and is no longer shown; before this a Korean customer with a typo
+         read "bad credentials". -->
+    <message>
+        <source>Enter your account id, your password and the rent&apos;s idx.</source>
+        <translation>계정 아이디, 비밀번호, 렌트 idx를 입력하세요.</translation>
+    </message>
+    <message>
+        <source>The AresVPN console&apos;s certificate could not be verified.</source>
+        <translation>AresVPN 콘솔의 인증서를 확인할 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>The AresVPN console did not answer: %1</source>
+        <translation>AresVPN 콘솔이 응답하지 않습니다: %1</translation>
+    </message>
+    <message>
+        <source>The AresVPN console refused this app&apos;s request. Updating the app should fix it.</source>
+        <translation>AresVPN 콘솔이 이 앱의 요청을 거부했습니다. 앱을 업데이트하면 해결됩니다.</translation>
+    </message>
+    <message>
+        <source>The console no longer accepts this device&apos;s sign-in. Sign in again.</source>
+        <translation>콘솔이 이 기기의 로그인 정보를 더 이상 받지 않습니다. 다시 로그인하세요.</translation>
+    </message>
+    <message>
+        <source>The account id or the password is wrong.</source>
+        <translation>계정 아이디 또는 비밀번호가 올바르지 않습니다.</translation>
+    </message>
+    <message>
+        <source>No rent in this account carries the idx &quot;%1&quot; right now.</source>
+        <translation>이 계정에는 지금 idx &quot;%1&quot;에 연결된 렌트가 없습니다.</translation>
+    </message>
+    <message>
+        <source>The console could not add this device to the rent. Try again later, or contact support.</source>
+        <translation>콘솔이 이 기기를 렌트에 추가하지 못했습니다. 나중에 다시 시도하거나 지원팀에 문의하세요.</translation>
+    </message>
+    <message>
+        <source>Too many attempts - wait a minute and try again.</source>
+        <translation>시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.</translation>
+    </message>
+    <message>
+        <source>The AresVPN console is busy - try again in a moment.</source>
+        <translation>AresVPN 콘솔이 바쁩니다. 잠시 후 다시 시도하세요.</translation>
+    </message>
+    <message>
+        <source>The AresVPN console answered HTTP %1.</source>
+        <translation>AresVPN 콘솔이 HTTP %1로 응답했습니다.</translation>
+    </message>
+    <message>
+        <source>This socks5 rent could not be turned into a client configuration (%1).</source>
+        <translation>이 socks5 렌트를 클라이언트 설정으로 바꿀 수 없습니다 (%1).</translation>
+    </message>
+    <message>
+        <source>An HTTP proxy rent is used from a browser or curl, not from this app. Its address and credentials are on your rent&apos;s page in the AresVPN console.</source>
+        <translation>HTTP 프록시 렌트는 이 앱이 아니라 브라우저나 curl에서 사용합니다. 주소와 인증 정보는 AresVPN 콘솔의 렌트 페이지에 있습니다.</translation>
+    </message>
+    <message>
+        <source>This app does not know the protocol &quot;%1&quot; yet.</source>
+        <translation>이 앱은 아직 &quot;%1&quot; 프로토콜을 지원하지 않습니다.</translation>
+    </message>
+    <message>
+        <source>The console returned an empty configuration for this rent.</source>
+        <translation>콘솔이 이 렌트에 대해 빈 설정을 보냈습니다.</translation>
+    </message>
+    <message>
+        <source>The rent&apos;s configuration could not be imported.</source>
+        <translation>렌트 설정을 가져올 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>This device could not store your sign-in securely: the system keychain refused. Nothing was changed.</source>
+        <translation>이 기기에 로그인 정보를 안전하게 저장할 수 없습니다. 시스템 키체인이 거부했습니다. 아무것도 바뀌지 않았습니다.</translation>
+    </message>
+    <message>
+        <source>Not signed in.</source>
+        <translation>로그인되어 있지 않습니다.</translation>
+    </message>
+    <message>
+        <source>A refresh is already running.</source>
+        <translation>이미 확인 중입니다.</translation>
     </message>
 </context>
 </TS>

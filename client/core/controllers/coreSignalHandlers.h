@@ -1,6 +1,7 @@
 #ifndef CORESIGNALHANDLERS_H
 #define CORESIGNALHANDLERS_H
 
+#include <QElapsedTimer>
 #include <QObject>
 #include "core/controllers/coreController.h"
 
@@ -41,10 +42,20 @@ private:
     void initIosSettingsHandler();
     void initNotificationHandler();
     void initUpdateFoundHandler();
-    void initAresSessionReconnectHandler();  // AresVPN Client (plan 24)
+    void initAresSessionTunnelHandler();  // AresVPN Client (plan 24, plan 28)
+
+    // AresVPN Client (plan 28): THE ONE ROUTINE by which the session re-points the tunnel - close it
+    // if it is up, set the default server to the session's, reopen it if the session still has a
+    // server. `refreshWhileDown` also refreshes the session in between, while no tunnel carries it.
+    enum class AresPending { None, Reopen, RefreshThenReopen };
+    void aresRepointTunnel(bool refreshWhileDown);
+    bool aresAdoptSessionServer();  // the default server becomes the session's; true when it moved
+    bool aresTunnelUp() const;      // Connected, Connecting or Reconnecting - not Disconnecting
 
     CoreController* m_coreController;
-    bool m_aresReconnectPending = false;     // closed for an identity change; open on Disconnected
+    AresPending m_aresPending = AresPending::None;  // what to do once the tunnel reports Disconnected
+    Vpn::ConnectionState m_aresTunnelState = Vpn::ConnectionState::Disconnected;
+    QElapsedTimer m_aresLastStallCycle;             // the last close -> refresh -> reopen for a stall
 };
 
 #endif // CORESIGNALHANDLERS_H

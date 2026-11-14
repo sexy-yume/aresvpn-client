@@ -32,9 +32,9 @@ QVariant SecureAppSettingsRepository::value(const QString &key, const QVariant &
     return m_settings->value(key, defaultValue);
 }
 
-void SecureAppSettingsRepository::setValue(const QString &key, const QVariant &value)
+bool SecureAppSettingsRepository::setValue(const QString &key, const QVariant &value)
 {
-    m_settings->setValue(key, value);
+    return m_settings->setValue(key, value);
 }
 
 QLocale SecureAppSettingsRepository::getAppLanguage() const
@@ -323,29 +323,21 @@ void SecureAppSettingsRepository::forgetRentExpiry(const QString &serverId)
     }
 }
 
-// AresVPN Client - the login session (#D187). See the header for why the password is in it.
+// AresVPN Client - the login session (#D187). See the header for what is in it and why.
 QVariantMap SecureAppSettingsRepository::getAresSession() const
 {
     return value("Conf/aresSession").toMap();
 }
 
-void SecureAppSettingsRepository::setAresSession(const QString &id, const QString &password,
-                                                 const QString &idx, const QString &serverId,
-                                                 const QString &deviceId, const QString &identity)
+bool SecureAppSettingsRepository::setAresSession(const QVariantMap &session)
 {
-    QVariantMap map;
-    map.insert(QStringLiteral("id"), id);
-    map.insert(QStringLiteral("pw"), password);
-    map.insert(QStringLiteral("idx"), idx);
-    map.insert(QStringLiteral("serverId"), serverId);
-    map.insert(QStringLiteral("deviceId"), deviceId);
-    map.insert(QStringLiteral("identity"), identity);
-    setValue("Conf/aresSession", map);
+    return setValue("Conf/aresSession", session);
 }
 
+// Removed rather than overwritten: forgetting needs no keychain, so a sign-out always forgets.
 void SecureAppSettingsRepository::clearAresSession()
 {
-    setValue("Conf/aresSession", QVariantMap());
+    m_settings->remove("Conf/aresSession");
 }
 
 void SecureAppSettingsRepository::resetGatewayEndpoint()

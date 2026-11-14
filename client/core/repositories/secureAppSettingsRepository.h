@@ -78,27 +78,29 @@ public:
     void setRentExpiry(const QString &serverId, const QString &expiresAtIso);
     void forgetRentExpiry(const QString &serverId);
 
-    // AresVPN Client - THE LOGIN SESSION (AresProject #D187). One session, not a list: `id` + `pw`
-    // + `idx`, plus the id of the one stored server that session currently owns.
+    // AresVPN Client - THE LOGIN SESSION (AresProject #D187). One session, not a list: `id` + `idx`,
+    // the credential that refreshes it, and the id of the one stored server that session owns.
     //
-    // THE PASSWORD IS HERE ON PURPOSE, and it is the operator's decision rather than mine
+    // THE CREDENTIAL IS HERE ON PURPOSE, and it is the operator's decision rather than mine
     // (*비밀번호를 기기에 저장한다*, #L007). It is what lets the client re-ask `/api/profile` for its
     // `idx` without the customer, which is the whole of #D187 point 6: the server side already
     // re-assigns a rent when a slot's address is re-allocated, and downloading only on a manual
-    // re-login leaves that finished feature half-working. This map lives in SecureQSettings, but NOT
-    // among its encrypted keys (`secureQSettings.cpp`: only "Servers/serversList" is), so it is stored
-    // in plain text - which is why "identity" is a digest, never the profile; encrypting it is a plan 18
-    // cherry-pick. It never reaches a command line (#D030) or a log.
+    // re-login leaves that finished feature half-working. Plan 28: the map is one of SecureQSettings'
+    // ENCRYPTED keys (`secureQSettings.cpp`), a session stored in plain text by an older build is
+    // rewritten encrypted at the next start, and a console that issues device tokens replaces the
+    // password with a token at the next answer. It never reaches a command line (#D030), a log or
+    // a settings backup.
     //
-    // Keys: "id", "pw", "idx", "serverId", and (plan 24) "deviceId" + "identity": the console's
-    // device id for this installation and the digest of the profile last imported for it, so a
-    // device re-created or re-keyed while the app was closed is still seen as changed after a
-    // restart. An empty map means NOT LOGGED IN, which is the branch the first screen reads - not
-    // "zero servers stored", which is what #D182 was implemented as and is a different question
-    // that only coincides by accident.
+    // Keys: "id", "idx", "serverId"; "pw" until the console issues a device token, then "token"
+    // instead; "etag", the console's tag for the profile last imported; and (plan 24) "deviceId" +
+    // "identity": the console's device id for this installation and the digest of the profile last
+    // imported for it, so a device re-created or re-keyed while the app was closed is still seen as
+    // changed after a restart. An empty map means NOT LOGGED IN, which is the branch the first
+    // screen reads - not "zero servers stored", which is what #D182 was implemented as and is a
+    // different question that only coincides by accident.
     QVariantMap getAresSession() const;
-    void setAresSession(const QString &id, const QString &password, const QString &idx,
-                        const QString &serverId, const QString &deviceId, const QString &identity);
+    // false when the encrypted store refused the write (no keychain): nothing was stored.
+    bool setAresSession(const QVariantMap &session);
     void clearAresSession();
     void writeGatewayProxyUrls(const QString &cacheKey, const QByteArray &proxyUrlsEncrypted);
 
@@ -155,7 +157,7 @@ private:
     void setInstallationUuid(const QString &uuid);
     
     QVariant value(const QString &key, const QVariant &defaultValue = QVariant()) const;
-    void setValue(const QString &key, const QVariant &value);
+    bool setValue(const QString &key, const QVariant &value);
 
     SecureQSettings* m_settings;
     QString m_gatewayEndpoint;

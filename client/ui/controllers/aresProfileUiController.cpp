@@ -3,9 +3,17 @@
 #include "aresProfileUiController.h"
 
 #include <QDateTime>
+#include <QDesktopServices>
+#include <QTimer>
+#include <QUrl>
 
 #include "core/utils/containers/containerUtils.h"
 #include "core/utils/errorStrings.h"
+
+namespace
+{
+    constexpr int kExpiryTickMsecs = 3600 * 1000;
+}
 
 AresProfileUiController::AresProfileUiController(AresProfileController *controller, QObject *parent)
     : QObject(parent), m_controller(controller)
@@ -13,18 +21,44 @@ AresProfileUiController::AresProfileUiController(AresProfileController *controll
     if (!m_controller) {
         return;
     }
-    // The core polls on its own timer (#D187 point 6); QML needs to hear about it, because a rent
-    // swapped underneath a live tunnel has to be reconnected onto, not merely re-stored.
-    connect(m_controller, &AresProfileController::sessionRentChanged, this,
-            [this](const QString &serverId, const QString &) {
+    // The core polls on its own timer (#D187 point 6) and re-points a running tunnel itself when the
+    // session's server is set (CoreSignalHandlers, plan 28); QML only re-reads the session.
+    connect(m_controller, &AresProfileController::sessionServerSet, this,
+            [this](const QString &serverId, bool) {
                 m_lastServerId = serverId;
-                emit sessionRentChanged(serverId);
                 emit sessionChanged();
             });
-    connect(m_controller, &AresProfileController::sessionRefreshFailed, this,
-            &AresProfileUiController::sessionRefreshFailed);
     connect(m_controller, &AresProfileController::sessionChanged, this,
             &AresProfileUiController::sessionChanged);
+
+    // #D187 says the client "refreshes when it can and says when it cannot". The saying was never
+    // built: a background 401 or 404 went to a signal nothing listened to (plan 28, H-6). Only the
+    // two answers a customer can act on, or should know about, are shown; an unreachable console is
+    // the normal state of a dead tunnel and is handled, not announced.
+    connect(m_controller, &AresProfileController::sessionRefreshFailed, this,
+            [this](int httpStatus, bool, const QString &) {
+                if (httpStatus == 401) {
+                    setSessionProblem(tr("This device has to sign in again: the console no longer accepts the sign-in stored on it."));
+                } else if (httpStatus == 404) {
+                    setSessionProblem(tr("No rent carries idx %1 right now. The app keeps checking and takes the new one as soon as it is assigned.")
+                                              .arg(sessionIdx()));
+                }
+            });
+    connect(m_controller, &AresProfileController::sessionRefreshed, this, [this]() { setSessionProblem(QString()); });
+
+    // The expiry line re-reads on a fetch that stored a new expiry, and once an hour so a countdown
+    // left running crosses midnight and the expiry itself (plan 28, H-10).
+    const auto bumpExpiry = [this]() {
+        ++m_expiryRevision;
+        emit expiryRevisionChanged();
+    };
+    connect(m_controller, &AresProfileController::imported, this, bumpExpiry);
+    m_expiryTick = new QTimer(this);
+    connect(m_expiryTick, &QTimer::timeout, this, bumpExpiry);
+    m_expiryTick->start(kExpiryTickMsecs);
+
+    connect(m_controller, &AresProfileController::updateInfoChanged, this,
+            &AresProfileUiController::updateInfoChanged);
 
     // Start the poll if this device is already signed in - the customer does not press anything to
     // get it, which is the whole point (#D187: a server-side re-allocation must reach the client
@@ -147,6 +181,43 @@ void AresProfileUiController::forgetRentExpiry(const QString &serverId)
 {
     if (m_controller) {
         m_controller->forgetRentExpiry(serverId);
+    }
+}
+
+void AresProfileUiController::setSessionProblem(const QString &problem)
+{
+    if (problem == m_sessionProblem) {
+        return;
+    }
+    m_sessionProblem = problem;
+    emit sessionProblemChanged();
+}
+
+bool AresProfileUiController::signInNeeded() const
+{
+    return m_controller && m_controller->signInNeeded();
+}
+
+bool AresProfileUiController::updateAvailable() const
+{
+    return m_controller && m_controller->updateInfo().available;
+}
+
+bool AresProfileUiController::updateRequired() const
+{
+    return m_controller && m_controller->updateInfo().required;
+}
+
+QString AresProfileUiController::updateVersion() const
+{
+    return m_controller ? m_controller->updateInfo().latest : QString();
+}
+
+void AresProfileUiController::openUpdatePage() const
+{
+    const QString url = m_controller ? m_controller->updateInfo().url : QString();
+    if (!url.isEmpty()) {
+        QDesktopServices::openUrl(QUrl(url));
     }
 }
 

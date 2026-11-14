@@ -201,6 +201,7 @@ PageType {
                 Text {
                     Layout.fillWidth: true
                     text: {
+                        AresProfileController.expiryRevision  // re-read on a new expiry, and hourly
                         var days = AresProfileController.expiryTextForServer(root.serverId)
                         return days === "" ? qsTr("no expiry recorded") : days
                     }
@@ -291,8 +292,8 @@ PageType {
 
             Text {
                 Layout.fillWidth: true
-                text: qsTr("This device forgets your account and removes the rent it holds. The rent "
-                         + "itself is not cancelled - sign in with the same idx to get it back.")
+                text: qsTr("This device disconnects, forgets your account and removes the rent it holds. "
+                         + "The rent itself is not cancelled - sign in with the same idx to get it back.")
                 color: AresStyle.color.textDim
                 font.family: AresStyle.font.family
                 font.pixelSize: AresStyle.size.small

@@ -18,7 +18,8 @@ public:
                              QObject *parent = nullptr, bool enableEncryption = true);
 
     QVariant value(const QString &key, const QVariant &defaultValue = QVariant()) const;
-    void setValue(const QString &key, const QVariant &value);
+    // false when the key must be encrypted and the keychain gave no key: nothing was written
+    bool setValue(const QString &key, const QVariant &value);
     void remove(const QString &key);
 
     QByteArray backupAppConfig() const;

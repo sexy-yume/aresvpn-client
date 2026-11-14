@@ -6,6 +6,8 @@
 #include <QObject>
 #include <QString>
 
+class QTimer;
+
 #include "core/controllers/aresProfileController.h"
 
 class AresProfileUiController : public QObject
@@ -22,6 +24,20 @@ class AresProfileUiController : public QObject
     Q_PROPERTY(QString sessionAccountId READ sessionAccountId NOTIFY sessionChanged)
     Q_PROPERTY(QString sessionIdx READ sessionIdx NOTIFY sessionChanged)
     Q_PROPERTY(QString sessionServerId READ sessionServerId NOTIFY sessionChanged)
+
+    // What the background refresh could not do, in one sentence for the home screen (plan 28,
+    // H-6): "sign in again" after a 401, "no rent on this idx" after a 404. Empty otherwise.
+    Q_PROPERTY(QString sessionProblem READ sessionProblem NOTIFY sessionProblemChanged)
+    Q_PROPERTY(bool signInNeeded READ signInNeeded NOTIFY sessionProblemChanged)
+
+    // Bumped whenever an expiry may read differently: a fetch stored one, or an hour passed. A
+    // binding that reads it re-evaluates daysLeftForServer/expiryTextForServer (plan 28, H-10).
+    Q_PROPERTY(int expiryRevision READ expiryRevision NOTIFY expiryRevisionChanged)
+
+    // The console's update manifest (plan 28, H-5). All false/empty while it serves none.
+    Q_PROPERTY(bool updateAvailable READ updateAvailable NOTIFY updateInfoChanged)
+    Q_PROPERTY(bool updateRequired READ updateRequired NOTIFY updateInfoChanged)
+    Q_PROPERTY(QString updateVersion READ updateVersion NOTIFY updateInfoChanged)
 
 public:
     explicit AresProfileUiController(AresProfileController *controller, QObject *parent = nullptr);
@@ -41,8 +57,8 @@ public slots:
     QString sessionServerId() const;
 
     // Ask the console what this session's idx points at NOW. Returns true when the stored rent was
-    // REPLACED, which the UI treats as a reason to reconnect. Never logs anybody out: a 404 means
-    // the operator is mid-swap, not that the customer is signed out (#D187's update).
+    // REPLACED; the core then re-points a running tunnel onto it. Never logs anybody out: a 404
+    // means the operator is mid-swap, not that the customer is signed out (#D187's update).
     bool refreshNow();
 
     // Forget the session and remove the rent it owns.
@@ -62,6 +78,16 @@ public slots:
     // ServersController because that file is upstream's and #D178 keeps its shape.
     void forgetRentExpiry(const QString &serverId);
 
+    QString sessionProblem() const { return m_sessionProblem; }
+    bool signInNeeded() const;
+    int expiryRevision() const { return m_expiryRevision; }
+
+    bool updateAvailable() const;
+    bool updateRequired() const;
+    QString updateVersion() const;
+    // Opens the manifest's download link in the browser.
+    void openUpdatePage() const;
+
     // The two things a rent screen shows and upstream had no accessor for. Found by RENDERING the
     // screens offscreen and looking at them: the home dial read "WireGuard | 112.168.124..." -
     // the address, which is the thing the customer bought, elided behind a protocol name that is
@@ -75,16 +101,19 @@ signals:
     void lastErrorChanged();
     void endpointChanged();
     void sessionChanged();
-
-    // The rent behind this session's idx was replaced under it - a re-allocated address, or an
-    // entirely different rent the operator hung the same idx on. The UI reconnects on this.
-    void sessionRentChanged(const QString &serverId);
-    void sessionRefreshFailed(const QString &message);
+    void sessionProblemChanged();
+    void expiryRevisionChanged();
+    void updateInfoChanged();
 
 private:
+    void setSessionProblem(const QString &problem);
+
     AresProfileController *m_controller;
     QString m_lastError;
     QString m_lastServerId;
+    QString m_sessionProblem;
+    int m_expiryRevision = 0;
+    QTimer *m_expiryTick = nullptr;
 };
 
 #endif // ARESPROFILEUICONTROLLER_H

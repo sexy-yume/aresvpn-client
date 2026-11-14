@@ -53,6 +53,16 @@
     #include "core/utils/swiftBridge.h"
 #endif
 
+namespace
+{
+    // AresVPN Client (plan 28). A refresh made while no tunnel carries it - at start, and inside the
+    // stall cycle - waits this long before the stored profile is used as it is.
+    constexpr int kAresDirectRefreshMsecs = 10000;
+    // A stall cycle drops the tunnel for a few seconds. When the console is what is down, every poll
+    // would look like a stall, so the cycle runs at most this often.
+    constexpr qint64 kAresStallCycleMsecs = 3600 * 1000;
+}
+
 CoreSignalHandlers::CoreSignalHandlers(CoreController* coreController, QObject* parent)
     : QObject(parent),
       m_coreController(coreController)
@@ -88,7 +98,7 @@ void CoreSignalHandlers::initAllHandlers()
     initIosSettingsHandler();
     initNotificationHandler();
     initUpdateFoundHandler();
-    initAresSessionReconnectHandler();
+    initAresSessionTunnelHandler();
 }
 
 void CoreSignalHandlers::initErrorMessagesHandler()
@@ -254,23 +264,45 @@ void CoreSignalHandlers::initAutoConnectHandler()
         return;
     }
 
-    const bool enabled = m_coreController->m_settingsUiController->isAutoConnectEnabled();
-    const QString defaultServerId = m_coreController->m_serversController->getDefaultServerId();
+    QTimer::singleShot(1000, this, [this]() {
+        AresProfileController *ares = m_coreController->m_aresProfileController;
 
-    // AND IT SAYS WHAT IT DECIDED, both ways. The operator turned this on, launched, and nothing
-    // connected - and there was no way to tell whether it had never fired, fired and been refused,
-    // or fired and failed. A feature that silently does not happen is the shape this project keeps
-    // paying for (#L012); one line removes the question.
-    if (!enabled) {
-        qDebug() << "auto-connect: off in settings";
-        return;
-    }
-    if (defaultServerId.isEmpty()) {
-        qDebug() << "auto-connect: on, but no rent is set up yet - nothing to connect to";
-        return;
-    }
-    qDebug() << "auto-connect: on, arming for" << defaultServerId;
-    QTimer::singleShot(1000, this, [this, defaultServerId]() {
+        // AresVPN Client (plan 28): REFRESH FIRST, while no tunnel is up. The session's first poll
+        // used to come 300 s after start, and auto-connect a second after it - so a stale profile
+        // (a re-allocated slot, a deleted or re-keyed device) brought up a dead tunnel, and every
+        // refresh after that went into it and timed out. Asked now, the console answers outside any
+        // tunnel; if it does not answer within kAresDirectRefreshMsecs, the stored profile is used.
+        if (ares->hasSession()) {
+            qDebug() << "ares session: refreshing before auto-connect";
+            ares->refreshSession(nullptr, kAresDirectRefreshMsecs);
+            aresAdoptSessionServer();
+        }
+        ares->startUpdateChecks();
+
+        const bool enabled = m_coreController->m_settingsUiController->isAutoConnectEnabled();
+        const QString defaultServerId = m_coreController->m_serversController->getDefaultServerId();
+
+        // AND IT SAYS WHAT IT DECIDED, both ways. The operator turned this on, launched, and nothing
+        // connected - and there was no way to tell whether it had never fired, fired and been refused,
+        // or fired and failed. A feature that silently does not happen is the shape this project keeps
+        // paying for (#L012); one line removes the question.
+        if (!enabled) {
+            qDebug() << "auto-connect: off in settings";
+            return;
+        }
+        if (defaultServerId.isEmpty()) {
+            qDebug() << "auto-connect: on, but no rent is set up yet - nothing to connect to";
+            return;
+        }
+        if (ares->updateInfo().required) {
+            qDebug() << "auto-connect: refused, this version is below the console's minimum";
+            return;
+        }
+        if (aresTunnelUp()) {
+            // A tunnel the system kept (Android restores one); toggling would close it.
+            qDebug() << "auto-connect: the tunnel is already up";
+            return;
+        }
         qDebug() << "auto-connect: firing for" << defaultServerId;
         m_coreController->m_connectionUiController->toggleConnection();
     });
@@ -469,46 +501,123 @@ void CoreSignalHandlers::initUpdateFoundHandler()
     });
 }
 
-// AresVPN Client (plan 24, D187 rule 6): the session's poll re-imports the profile when the idx
-// moves to another rent or this device gets a new identity on the same rent (deleted and re-created,
-// re-keyed). Storing the new config is not enough - the running tunnel still holds the dead key, and
-// WireGuard then stops handshaking with no error. So when the changed server is the one the tunnel
-// uses, close it and open it again once it reports Disconnected.
-void CoreSignalHandlers::initAresSessionReconnectHandler()
+// AresVPN Client: THE SESSION OWNS THE TUNNEL (plan 24, D187 rule 6; plan 28).
+//
+// Every change of the session's server - a sign-in, a switch to another rent, a sign-out, a poll
+// that brought a different rent or this device's new identity - re-points the tunnel through ONE
+// routine: close it if it is up, make the session's server the default, reopen it if the session
+// still has one. Storing a new config is not enough on its own - the running tunnel still holds the
+// dead key, and WireGuard then stops handshaking with no error - and signing out without closing it
+// left the next person at a shared PC on this customer's rent.
+//
+// AND THE REFRESH NEVER DEPENDS ON THE TUNNEL IT REPAIRS. A rent routes 0.0.0.0/0, so a poll made
+// while the tunnel is up travels inside it, and a tunnel whose endpoint or key is dead swallows the
+// poll that would have fixed it. When a poll gets no answer at all while the tunnel is up, the
+// routine closes the tunnel, refreshes with nothing in the way, and reopens on whatever the console
+// returned. Excluding the console from the tunnel was the alternative; it is not taken because the
+// rent's resolvers are routed through the same tunnel (the console's name would not resolve either),
+// because Android offers no per-socket exclusion for Qt's network stack, and because it is the
+// standing exception #D181 defers to the owner, where #D187 says the refresh opens no hole.
+void CoreSignalHandlers::initAresSessionTunnelHandler()
 {
-    connect(m_coreController->m_aresProfileController, &AresProfileController::sessionRentChanged, this,
-            [this](const QString &serverId, const QString &) {
-                ConnectionUiController *connection = m_coreController->m_connectionUiController;
-                if (serverId != m_coreController->m_serversController->getDefaultServerId()) {
-                    qDebug() << "ares session: identity changed for" << serverId << "- not the default server, no reconnect";
-                    return;
-                }
-                if (!connection->isConnected() && !connection->isConnectionInProgress()) {
-                    qDebug() << "ares session: identity changed for" << serverId << "- tunnel is down, nothing to reconnect";
-                    return;
-                }
-                qDebug() << "ares session: identity changed for" << serverId << "- reconnecting the tunnel";
-                m_aresReconnectPending = true;
-                connection->closeConnection();
-            });
+    AresProfileController *ares = m_coreController->m_aresProfileController;
+
+    connect(ares, &AresProfileController::sessionServerSet, this, [this](const QString &serverId, bool identityChanged) {
+        // The running tunnel is stale when the session's identity moved, or when it runs on a
+        // server that was not the session's (an imported file had become the default).
+        const bool defaultMoved = aresAdoptSessionServer();
+        if (!identityChanged && !defaultMoved) {
+            return;
+        }
+        if (!aresTunnelUp()) {
+            qDebug() << "ares session: server set to" << serverId << "- tunnel is down, nothing to re-point";
+            return;
+        }
+        qDebug() << "ares session: server set to" << (serverId.isEmpty() ? QStringLiteral("none (signed out)") : serverId)
+                 << "- re-pointing the tunnel";
+        aresRepointTunnel(false);
+    });
+
+    connect(ares, &AresProfileController::sessionRefreshFailed, this, [this](int, bool noAnswer, const QString &) {
+        if (!noAnswer || !aresTunnelUp()) {
+            return;
+        }
+        if (m_aresLastStallCycle.isValid() && m_aresLastStallCycle.elapsed() < kAresStallCycleMsecs) {
+            qDebug() << "ares session: no answer through the tunnel, but a stall cycle ran within the hour";
+            return;
+        }
+        m_aresLastStallCycle.start();
+        qDebug() << "ares session: no answer through the tunnel - closing it to refresh outside it";
+        aresRepointTunnel(true);
+    });
 
     connect(m_coreController->m_connectionController, &ConnectionController::connectionStateChanged, this,
             [this](Vpn::ConnectionState state) {
-                if (!m_aresReconnectPending) {
+                m_aresTunnelState = state;
+                if (m_aresPending == AresPending::None) {
                     return;
                 }
                 if (state == Vpn::ConnectionState::Error) {
                     // The close itself failed; leave the tunnel to the user rather than open over it.
-                    m_aresReconnectPending = false;
-                    qWarning() << "ares session: reconnect abandoned, closing the tunnel reported an error";
+                    m_aresPending = AresPending::None;
+                    qWarning() << "ares session: re-point abandoned, closing the tunnel reported an error";
                     return;
                 }
                 if (state != Vpn::ConnectionState::Disconnected) {
                     return;
                 }
-                m_aresReconnectPending = false;
-                // Queued: open from a clean stack, not from inside the state change that closed it.
-                QTimer::singleShot(0, m_coreController->m_connectionUiController, &ConnectionUiController::openConnection);
+                const AresPending pending = m_aresPending;
+                m_aresPending = AresPending::None;
+                // Queued: work from a clean stack, not from inside the state change that closed it.
+                QTimer::singleShot(0, this, [this, pending]() {
+                    AresProfileController *ares = m_coreController->m_aresProfileController;
+                    if (pending == AresPending::RefreshThenReopen) {
+                        // No tunnel now: this request leaves by the ordinary route.
+                        ares->refreshSession(nullptr, kAresDirectRefreshMsecs);
+                    }
+                    aresAdoptSessionServer();
+                    if (ares->sessionServerId().isEmpty()) {
+                        qDebug() << "ares session: no session server - the tunnel stays closed";
+                        return;
+                    }
+                    if (aresTunnelUp()) {
+                        return;  // reopened meanwhile, by the customer
+                    }
+                    m_coreController->m_connectionUiController->openConnection();
+                });
             });
+}
+
+void CoreSignalHandlers::aresRepointTunnel(bool refreshWhileDown)
+{
+    const AresPending wanted = refreshWhileDown ? AresPending::RefreshThenReopen : AresPending::Reopen;
+    if (m_aresPending != AresPending::None) {
+        // A close is already under way; it carries the refresh too if one is now owed.
+        if (wanted == AresPending::RefreshThenReopen) {
+            m_aresPending = wanted;
+        }
+        return;
+    }
+    m_aresPending = wanted;
+    m_coreController->m_connectionUiController->closeConnection();
+}
+
+bool CoreSignalHandlers::aresAdoptSessionServer()
+{
+    const QString serverId = m_coreController->m_aresProfileController->sessionServerId();
+    ServersController *servers = m_coreController->m_serversController;
+    if (serverId.isEmpty() || servers->indexOfServerId(serverId) < 0 || servers->getDefaultServerId() == serverId) {
+        return false;
+    }
+    servers->setDefaultServer(serverId);
+    return true;
+}
+
+// A tunnel being closed is not up: re-pointing it then would reopen what the customer is closing.
+bool CoreSignalHandlers::aresTunnelUp() const
+{
+    return m_aresTunnelState == Vpn::ConnectionState::Connected
+        || m_aresTunnelState == Vpn::ConnectionState::Connecting
+        || m_aresTunnelState == Vpn::ConnectionState::Reconnecting;
 }
 

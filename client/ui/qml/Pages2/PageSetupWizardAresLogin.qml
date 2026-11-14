@@ -162,14 +162,16 @@ PageType {
                 Layout.rightMargin: 16
                 Layout.bottomMargin: 16
 
-                // #D187: the password IS stored now, and saying otherwise would be a false statement to a
+                // #D187: the sign-in IS stored, and saying otherwise would be a false statement to a
                 // customer about what is on their own disk. It is the operator's decision
                 // (*비밀번호를 기기에 저장한다*), and it is what lets this device follow its idx
                 // when the console re-assigns the rent behind it - without which the server
-                // side's automatic re-allocation stays half a feature.
-                text: qsTr("Signing in stores your account and this rent on this device, encrypted, "
-                           + "so the app can follow your idx if the rent behind it changes. "
-                           + "Your password goes to %1 over TLS.").arg(AresProfileController.endpoint)
+                // side's automatic re-allocation stays half a feature. Plan 28: "encrypted" is now
+                // true - the session is one of SecureQSettings' encrypted keys, under a key the
+                // system keychain holds - and it was false when this sentence first shipped.
+                text: qsTr("Signing in stores your sign-in and this rent on this device, encrypted with a key "
+                           + "held by the system keychain, so the app can follow your idx if the rent behind "
+                           + "it changes. Your password goes to %1 over TLS.").arg(AresProfileController.endpoint)
             }
         }
     }

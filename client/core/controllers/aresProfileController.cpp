@@ -9,12 +9,14 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSslError>
 #include <QUrl>
 #include <QSysInfo>
 #include <QUuid>
+#include <QVersionNumber>
 
 #include "amneziaApplication.h"
 #include "core/controllers/selfhosted/importController.h"
@@ -26,6 +28,7 @@
 #include "core/utils/serialization/serialization.h"
 #include "core/utils/serverConfigUtils.h"
 #include "core/utils/utilities.h"
+#include "version.h"
 
 #ifdef AMNEZIA_DESKTOP
     #include "core/utils/ipcClient.h"
@@ -37,6 +40,25 @@ namespace
 {
     constexpr int kRequestTimeoutMsecs = 30000;
     constexpr char kProfilePath[] = "/api/profile";
+    // Plan 28: the device-token refresh and the update manifest. Both are served by the console
+    // from plan 28's server release; until then the refresh path is never taken (no token is ever
+    // issued) and the manifest answers 404, which leaves the check inert.
+    constexpr char kRefreshPath[] = "/api/profile/refresh";
+    constexpr char kManifestPath[] = "/api/client/manifest";
+    constexpr int kPollSeconds = 300;
+    constexpr int kUpdateCheckSeconds = 6 * 3600;
+
+    // The manifest's key for this build's platform; empty where no build is shipped.
+    QString manifestPlatform()
+    {
+#if defined(Q_OS_ANDROID)
+        return QStringLiteral("android");
+#elif defined(Q_OS_WINDOWS)
+        return QStringLiteral("windows");
+#else
+        return QString();
+#endif
+    }
 }
 
 AresProfileController::AresProfileController(ImportController *importController, SecureServersRepository *serversRepository,
@@ -84,8 +106,8 @@ QString AresProfileController::identityDigest(const QString &text)
             kept.append(trimmed);
         }
     }
-    // A digest, not the text: the text holds the device's private key, and this is persisted with
-    // the session, which is not one of SecureQSettings' encrypted keys.
+    // A digest, not the text: the text holds the device's private key, and the server list is the
+    // one place that key is kept - the session stores only what tells two profiles apart.
     return QString::fromLatin1(QCryptographicHash::hash(kept.join(QLatin1Char('\n')).trimmed().toUtf8(),
                                                         QCryptographicHash::Sha256).toHex());
 }
@@ -120,15 +142,21 @@ QString AresProfileController::xrayConfigForSocks5(const QString &uri, QString *
     return Utils::JsonToString(root, QJsonDocument::JsonFormat::Compact);
 }
 
-AresProfileController::Reply AresProfileController::post(const QString &url, const QByteArray &jsonBody)
+AresProfileController::Reply AresProfileController::request(const QString &url, const QByteArray &jsonBody,
+                                                            int timeoutMsecs, const QByteArray &ifNoneMatch)
 {
     Reply out;
-    QNetworkRequest request;
-    request.setTransferTimeout(kRequestTimeoutMsecs);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader(QByteArrayLiteral("X-Client-Request-ID"),
-                         QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8());
-    request.setUrl(QUrl(url));
+    QNetworkRequest req;
+    req.setTransferTimeout(timeoutMsecs > 0 ? timeoutMsecs : kRequestTimeoutMsecs);
+    req.setRawHeader(QByteArrayLiteral("X-Client-Request-ID"),
+                     QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8());
+    if (!jsonBody.isNull()) {
+        req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    }
+    if (!ifNoneMatch.isEmpty()) {
+        req.setRawHeader(QByteArrayLiteral("If-None-Match"), ifNoneMatch);
+    }
+    req.setUrl(QUrl(url));
 
     // With the strict kill switch on, nothing leaves the machine that is not on the allow list -
     // the console must be, for as long as the login takes (the shape GatewayController uses).
@@ -145,7 +173,8 @@ AresProfileController::Reply AresProfileController::post(const QString &url, con
     }
 #endif
 
-    QNetworkReply *reply = amnApp->networkManager()->post(request, jsonBody);
+    QNetworkAccessManager *nam = amnApp->networkManager();
+    QNetworkReply *reply = jsonBody.isNull() ? nam->get(req) : nam->post(req, jsonBody);
     QEventLoop wait;
     connect(reply, &QNetworkReply::finished, &wait, &QEventLoop::quit);
     // TLS errors are recorded and REFUSED; nothing here ever calls ignoreSslErrors() - the whole
@@ -155,6 +184,7 @@ AresProfileController::Reply AresProfileController::post(const QString &url, con
 
     out.httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     out.body = reply->readAll();
+    out.etag = reply->rawHeader(QByteArrayLiteral("ETag"));
     if (out.httpStatus == 0) {
         out.transportError = reply->errorString();
     }
@@ -162,7 +192,8 @@ AresProfileController::Reply AresProfileController::post(const QString &url, con
     return out;
 }
 
-AresProfileController::Result AresProfileController::fetchAndImport(const QString &id, const QString &password, const QString &idx)
+AresProfileController::Result AresProfileController::fetchAndImport(const QString &id, const QString &password,
+                                                                    const QString &idx, int timeoutMsecs)
 {
     Result result;
     if (!m_importController || !m_serversRepository) {
@@ -187,7 +218,47 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
         payload[QStringLiteral("device")] = m_appSettingsRepository->getInstallationUuid(true);
     }
     payload[QStringLiteral("device_name")] = deviceName();
-    const Reply reply = post(endpoint() + QString::fromLatin1(kProfilePath), QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    const Reply reply = request(endpoint() + QString::fromLatin1(kProfilePath),
+                                QJsonDocument(payload).toJson(QJsonDocument::Compact), timeoutMsecs);
+    return importReply(reply, alias, false);
+}
+
+// Plan 28: the refresh a device token pays for, in place of the password. The console looks the
+// token up by its hash - no scrypt, outside the login gate - and answers 304 when the profile behind
+// the ETag we hold has not moved. The token alone names the account, the rent's idx and this
+// installation on the console; `device` is sent so a token copied to another machine is refused.
+AresProfileController::Result AresProfileController::refreshWithToken(const QString &token, const QString &idx,
+                                                                      const QString &etag, int timeoutMsecs)
+{
+    Result result;
+    if (!m_importController || !m_serversRepository || !m_appSettingsRepository) {
+        result.errorCode = ErrorCode::InternalError;
+        return result;
+    }
+    QJsonObject payload;
+    payload[QStringLiteral("token")] = token;
+    payload[QStringLiteral("device")] = m_appSettingsRepository->getInstallationUuid(true);
+    payload[QStringLiteral("device_name")] = deviceName();
+    Reply reply = request(endpoint() + QString::fromLatin1(kRefreshPath),
+                          QJsonDocument(payload).toJson(QJsonDocument::Compact), timeoutMsecs, etag.toUtf8());
+    if (reply.httpStatus == 304) {
+        result.httpStatus = 304;
+        result.notModified = true;
+        return result;
+    }
+    if (reply.httpStatus == 404 && !QJsonDocument::fromJson(reply.body).isObject()) {
+        // The console's "no rent on this idx" is a JSON 404; a bare one means the route itself is
+        // gone (a console rolled back past device tokens). The password is no longer stored, so a
+        // sign-in is the only way on - which is what a 401 says.
+        reply.httpStatus = 401;
+    }
+    return importReply(reply, idx.trimmed(), true);
+}
+
+AresProfileController::Result AresProfileController::importReply(const Reply &reply, const QString &alias, bool viaToken)
+{
+    Result result;
+    result.httpStatus = reply.httpStatus;
 
     if (reply.sslError) {
         result.errorCode = ErrorCode::AresEndpointUnreachable;
@@ -196,6 +267,7 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
     }
     if (reply.httpStatus == 0) {
         result.errorCode = ErrorCode::AresEndpointUnreachable;
+        result.noAnswer = true;
         result.message = tr("The AresVPN console did not answer: %1").arg(reply.transportError);
         return result;
     }
@@ -203,23 +275,42 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
     QJsonParseError parseError;
     const QJsonDocument doc = QJsonDocument::fromJson(reply.body, &parseError);
     const QJsonObject body = doc.isObject() ? doc.object() : QJsonObject();
-    const QString serverSentence = body.value(QStringLiteral("error")).toString();
 
+    // The message is ours, chosen by status and translated. The console's own sentence is English
+    // and was what a customer used to read ("bad credentials"), which made every translated text
+    // here unreachable; it is kept for the log only.
+    if (reply.httpStatus != 200) {
+        qWarning() << "AresProfileController: the console answered" << reply.httpStatus
+                   << body.value(QStringLiteral("error")).toString();
+    }
     switch (reply.httpStatus) {
     case 200:
         break;
+    case 400:
+        result.errorCode = ErrorCode::AresEndpointUnreachable;
+        result.message = tr("The AresVPN console refused this app's request. Updating the app should fix it.");
+        return result;
     case 401:
         result.errorCode = ErrorCode::AresBadCredentials;
-        result.message = serverSentence.isEmpty() ? tr("bad credentials") : serverSentence;
+        result.message = viaToken
+                ? tr("The console no longer accepts this device's sign-in. Sign in again.")
+                : tr("The account id or the password is wrong.");
         return result;
     case 404:
         result.errorCode = ErrorCode::AresNoSuchRent;
-        result.message = serverSentence.isEmpty() ? tr("no such rent") : serverSentence;
+        result.message = tr("No rent in this account carries the idx \"%1\" right now.").arg(alias);
+        return result;
+    case 409:
+        result.errorCode = ErrorCode::AresEndpointUnreachable;
+        result.message = tr("The console could not add this device to the rent. Try again later, or contact support.");
         return result;
     case 429:
-    case 503:
         result.errorCode = ErrorCode::AresEndpointUnreachable;
         result.message = tr("Too many attempts - wait a minute and try again.");
+        return result;
+    case 503:
+        result.errorCode = ErrorCode::AresEndpointUnreachable;
+        result.message = tr("The AresVPN console is busy - try again in a moment.");
         return result;
     default:
         result.errorCode = ErrorCode::AresEndpointUnreachable;
@@ -229,6 +320,8 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
 
     result.rentId = body.value(QStringLiteral("rent_id")).toInt();
     result.protocol = body.value(QStringLiteral("protocol")).toString();
+    result.refreshToken = body.value(QStringLiteral("refresh_token")).toString();
+    result.etag = QString::fromUtf8(reply.etag);
     // A number for tunnel rents, null for proxies; kept as text so null stays distinguishable.
     const QJsonValue deviceId = body.value(QStringLiteral("device_id"));
     result.deviceId = deviceId.isDouble() ? QString::number(deviceId.toVariant().toLongLong()) : QString();
@@ -308,9 +401,9 @@ AresProfileController::Result AresProfileController::fetchAndImport(const QStrin
 
 // ---- THE LOGIN SESSION (AresProject #D187) --------------------------------------------------
 //
-// One session: id + pw + idx. The client is bound to the **idx**, not to a rent - whatever rent
-// carries that idx right now is the rent this device uses. That is the whole model, and it is why
-// there is no list here and nothing to add to.
+// One session: id + idx + the credential that refreshes it. The client is bound to the **idx**,
+// not to a rent - whatever rent carries that idx right now is the rent this device uses. That is
+// the whole model, and it is why there is no list here and nothing to add to.
 
 bool AresProfileController::hasSession() const
 {
@@ -355,11 +448,29 @@ void AresProfileController::adoptServer(const QString &newServerId, const QStrin
     }
 }
 
+// Plan 28: a console that issues device tokens takes the password off the device. The first answer
+// that carries a token - a sign-in, or the refresh of a session stored before the console had
+// tokens - replaces "pw" with "token", and from then on the password is neither stored nor sent.
+// A console without tokens never sends one, and the session keeps the password as before.
+QVariantMap AresProfileController::sessionWith(QVariantMap base, const Result &r)
+{
+    base.insert(QStringLiteral("serverId"), r.serverId);
+    base.insert(QStringLiteral("deviceId"), r.deviceId);
+    base.insert(QStringLiteral("identity"), r.identity);
+    base.insert(QStringLiteral("etag"), r.etag);
+    if (!r.refreshToken.isEmpty()) {
+        base.insert(QStringLiteral("token"), r.refreshToken);
+        base.remove(QStringLiteral("pw"));
+    }
+    return base;
+}
+
 AresProfileController::Result AresProfileController::loginSession(const QString &id,
                                                                   const QString &password,
                                                                   const QString &idx)
 {
-    const QString previousServerId = sessionServerId();
+    const QVariantMap previous = m_appSettingsRepository ? m_appSettingsRepository->getAresSession() : QVariantMap();
+    const QString previousServerId = previous.value(QStringLiteral("serverId")).toString();
 
     Result r = fetchAndImport(id, password, idx);
     if (r.errorCode != amnezia::ErrorCode::NoError) {
@@ -368,18 +479,38 @@ AresProfileController::Result AresProfileController::loginSession(const QString 
         return r;
     }
 
-    adoptServer(r.serverId, previousServerId);
-    if (m_appSettingsRepository) {
-        m_appSettingsRepository->setAresSession(id, password, idx, r.serverId, r.deviceId, r.identity);
+    QVariantMap base;
+    base.insert(QStringLiteral("id"), id);
+    base.insert(QStringLiteral("pw"), password);
+    base.insert(QStringLiteral("idx"), idx);
+    if (!m_appSettingsRepository || !m_appSettingsRepository->setAresSession(sessionWith(base, r))) {
+        // The encrypted store refused the write (no keychain). Nothing may be left half-done: the
+        // server just imported goes again, and the previous session stands.
+        if (r.serverId != previousServerId && m_serversRepository
+            && m_serversRepository->orderedServerIds().contains(r.serverId)) {
+            m_serversRepository->removeServer(r.serverId);
+            forgetRentExpiry(r.serverId);
+        }
+        r.errorCode = amnezia::ErrorCode::InternalError;
+        r.message = tr("This device could not store your sign-in securely: the system keychain refused. Nothing was changed.");
+        return r;
     }
+
+    adoptServer(r.serverId, previousServerId);
+    m_signInNeeded = false;
     // A first sign-in has no poll running yet (the UI controller starts it only for a session that
     // already existed at launch, and a logout stops it), so start it here.
     startSessionPolling();
     emit sessionChanged();
+    emit sessionRefreshed();
+    const bool identityChanged = r.serverId != previousServerId
+            || r.deviceId != previous.value(QStringLiteral("deviceId")).toString()
+            || r.identity != previous.value(QStringLiteral("identity")).toString();
+    emit sessionServerSet(r.serverId, identityChanged);
     return r;
 }
 
-AresProfileController::Result AresProfileController::refreshSession(bool *changed)
+AresProfileController::Result AresProfileController::refreshSession(bool *changed, int timeoutMsecs)
 {
     if (changed) {
         *changed = false;
@@ -399,14 +530,16 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
     m_refreshing = true;
 
     const QVariantMap session = m_appSettingsRepository->getAresSession();
-    const QString id = session.value(QStringLiteral("id")).toString();
-    const QString pw = session.value(QStringLiteral("pw")).toString();
     const QString idx = session.value(QStringLiteral("idx")).toString();
+    const QString token = session.value(QStringLiteral("token")).toString();
     const QString previousServerId = session.value(QStringLiteral("serverId")).toString();
     const QString previousDeviceId = session.value(QStringLiteral("deviceId")).toString();
     const QString previousIdentity = session.value(QStringLiteral("identity")).toString();
 
-    r = fetchAndImport(id, pw, idx);
+    r = token.isEmpty()
+            ? fetchAndImport(session.value(QStringLiteral("id")).toString(),
+                             session.value(QStringLiteral("pw")).toString(), idx, timeoutMsecs)
+            : refreshWithToken(token, idx, session.value(QStringLiteral("etag")).toString(), timeoutMsecs);
     m_refreshing = false;
 
     if (r.errorCode != amnezia::ErrorCode::NoError) {
@@ -415,7 +548,26 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
         // window an operator is inside while they retire one rent and hang the same idx on another
         // (#D187's update). Throwing the customer back to a login screen mid-swap would be worse
         // than never refreshing at all. The session stands; the next poll picks up the replacement.
-        emit sessionRefreshFailed(r.message);
+        //
+        // A 401 is different (plan 28): the stored credential is dead - the password was changed,
+        // or the device and its token were deleted - and asking again every five minutes only fills
+        // the console's log with refusals that look like credential stuffing. The poll stops, the
+        // stored profile stays (it still works when only the password changed), and the customer is
+        // asked to sign in again.
+        if (r.httpStatus == 401) {
+            m_signInNeeded = true;
+            stopSessionPolling();
+        }
+        emit sessionRefreshFailed(r.httpStatus, r.noAnswer, r.message);
+        return r;
+    }
+    if (m_signInNeeded) {
+        // The credential works again (a manual check after a transient refusal): resume the poll.
+        m_signInNeeded = false;
+        startSessionPolling();
+    }
+    emit sessionRefreshed();
+    if (r.notModified) {
         return r;
     }
 
@@ -426,17 +578,25 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
     // no stored identity (written by a client before plan 24, which sent no `device`) counts as
     // changed once: its stored config is the rent's first device, not this installation's.
     const bool identityChanged = r.deviceId != previousDeviceId || r.identity != previousIdentity;
+    const bool serverChanged = r.serverId != previousServerId || identityChanged;
 
-    if (r.serverId != previousServerId || identityChanged) {
+    const QVariantMap next = sessionWith(session, r);
+    if (next != session && !m_appSettingsRepository->setAresSession(next)) {
+        // The keychain refused. Announcing a change that is not stored would reconnect on every
+        // poll, so say nothing and keep the session as it was.
+        r.errorCode = amnezia::ErrorCode::InternalError;
+        r.message = tr("This device could not store your sign-in securely: the system keychain refused. Nothing was changed.");
+        return r;
+    }
+    if (serverChanged) {
         // A DIFFERENT RENT, or this device's new identity on the same rent: adopt it (a no-op when
-        // the server id is unchanged), and tell the UI so it reconnects onto what the customer has.
+        // the server id is unchanged), and announce it so the tunnel is re-pointed onto it.
         adoptServer(r.serverId, previousServerId);
-        m_appSettingsRepository->setAresSession(id, pw, idx, r.serverId, r.deviceId, r.identity);
         if (changed) {
             *changed = true;
         }
-        emit sessionRentChanged(r.serverId, previousServerId);
         emit sessionChanged();
+        emit sessionServerSet(r.serverId, true);
     }
     return r;
 }
@@ -444,6 +604,9 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
 void AresProfileController::logoutSession()
 {
     const QString serverId = sessionServerId();
+    // Announced FIRST, so the tunnel is closed before the server it runs on is removed (plan 28).
+    // Signing out on a shared PC must not leave the next person on this customer's rent.
+    emit sessionServerSet(QString(), true);
     if (!serverId.isEmpty() && m_serversRepository
         && m_serversRepository->orderedServerIds().contains(serverId)) {
         m_serversRepository->removeServer(serverId);
@@ -452,8 +615,10 @@ void AresProfileController::logoutSession()
         m_appSettingsRepository->forgetRentExpiry(serverId);
         m_appSettingsRepository->clearAresSession();
     }
+    m_signInNeeded = false;
     stopSessionPolling();
     emit sessionChanged();
+    emit sessionRefreshed();
 }
 
 // The poll. Five minutes by default: the thing it is watching for is an operator re-allocating a
@@ -462,11 +627,11 @@ void AresProfileController::logoutSession()
 // that asks too often, and that guard is not to be worked around).
 void AresProfileController::startSessionPolling(int intervalSeconds)
 {
-    const int secs = intervalSeconds > 0 ? intervalSeconds : 300;
+    const int secs = intervalSeconds > 0 ? intervalSeconds : kPollSeconds;
     if (!m_pollTimer) {
         m_pollTimer = new QTimer(this);
         connect(m_pollTimer, &QTimer::timeout, this, [this]() {
-            if (!hasSession()) {
+            if (!hasSession() || m_signInNeeded) {
                 return;
             }
             bool changed = false;
@@ -481,6 +646,60 @@ void AresProfileController::stopSessionPolling()
     if (m_pollTimer) {
         m_pollTimer->stop();
     }
+}
+
+// ---- THE UPDATE MANIFEST (plan 28) ------------------------------------------------------------
+//
+// The console serves one JSON object with a block per platform:
+//   { "windows": { "latest": "5.0.3.0", "min_version": "5.0.0.0",
+//                  "url": "https://...", "sha256": "<hex>" }, "android": { ... } }
+// `latest` newer than this build shows an offer; this build older than `min_version` refuses to
+// connect and says so. `sha256` is for the download page and a future in-app installer; nothing
+// here downloads. Anything that does not parse is ignored, and a 404 - the console serves no
+// manifest - clears what an earlier check found, so removing the route switches the banner off.
+void AresProfileController::checkForUpdate(int timeoutMsecs)
+{
+    const QString platform = manifestPlatform();
+    if (platform.isEmpty()) {
+        return;
+    }
+    const Reply reply = request(endpoint() + QString::fromLatin1(kManifestPath), QByteArray(), timeoutMsecs);
+    UpdateInfo info;
+    if (reply.httpStatus == 200 && !reply.sslError) {
+        const QJsonObject entry = QJsonDocument::fromJson(reply.body).object().value(platform).toObject();
+        const QVersionNumber current = QVersionNumber::fromString(QString::fromLatin1(APP_VERSION));
+        const QVersionNumber latest = QVersionNumber::fromString(entry.value(QStringLiteral("latest")).toString());
+        const QVersionNumber minimum = QVersionNumber::fromString(entry.value(QStringLiteral("min_version")).toString());
+        const QUrl url(entry.value(QStringLiteral("url")).toString());
+        // An offer the customer cannot follow is no offer: the link must be https.
+        if (!current.isNull() && !latest.isNull() && url.isValid() && url.scheme() == QLatin1String("https")) {
+            info.latest = latest.toString();
+            info.url = url.toString();
+            info.available = QVersionNumber::compare(latest, current) > 0;
+            info.required = !minimum.isNull() && QVersionNumber::compare(current, minimum) < 0;
+        } else {
+            qWarning() << "AresProfileController: the update manifest has no usable entry for" << platform;
+        }
+    } else if (reply.httpStatus != 404) {
+        // Unreachable, or an error: keep what the last good answer said.
+        qDebug() << "AresProfileController: update check failed" << reply.httpStatus << reply.transportError;
+        return;
+    }
+    if (info.latest != m_updateInfo.latest || info.url != m_updateInfo.url
+        || info.available != m_updateInfo.available || info.required != m_updateInfo.required) {
+        m_updateInfo = info;
+        emit updateInfoChanged();
+    }
+}
+
+void AresProfileController::startUpdateChecks()
+{
+    if (!m_updateTimer) {
+        m_updateTimer = new QTimer(this);
+        connect(m_updateTimer, &QTimer::timeout, this, [this]() { checkForUpdate(); });
+    }
+    m_updateTimer->start(kUpdateCheckSeconds * 1000);
+    checkForUpdate(10000);
 }
 
 QString AresProfileController::rentExpiry(const QString &serverId) const

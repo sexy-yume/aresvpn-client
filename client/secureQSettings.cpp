@@ -23,20 +23,30 @@ namespace {
     constexpr const char *keyChainName = CLIENT_KEYCHAIN_NAME_STR;
 }
 
+// AresVPN Client (AresProject plan 28): `Conf/aresSession` holds the account's refresh credential
+// (the password, or a device token from a console that issues them), so it is encrypted like the
+// server list. It is also kept out of settings backups (backupAppConfig, restoreAppConfig).
 SecureQSettings::SecureQSettings(const QString &organization, const QString &application, QObject *parent, bool enableEncryption)
-    : QObject { parent }, m_settings(organization, application, parent), encryptedKeys({ "Servers/serversList" }), m_encryptionEnabled(enableEncryption)
+    : QObject { parent }, m_settings(organization, application, parent),
+      encryptedKeys({ "Servers/serversList", "Conf/aresSession" }), m_encryptionEnabled(enableEncryption)
 {
-    bool encrypted = m_settings.value("Conf/encrypted").toBool();
-
-    // convert settings to encrypted for if updated to >= 2.1.0
-    if (encryptionRequired() && !encrypted) {
-        for (const QString &key : m_settings.allKeys()) {
-            if (encryptedKeys.contains(key)) {
-                const QVariant &val = value(key);
-                setValue(key, val);
+    // Rewrite every encrypted key still stored in plain text. Upstream ran this once per install,
+    // behind the `Conf/encrypted` flag, so a key added to `encryptedKeys` later was never migrated:
+    // every existing install already had the flag. Asking the stored value itself is what holds for
+    // a key added at any time, and it costs one prefix check per key once nothing is left to do.
+    if (encryptionRequired()) {
+        for (const QString &key : encryptedKeys) {
+            if (!m_settings.contains(key)) {
+                continue;
+            }
+            const QVariant raw = m_settings.value(key);
+            if (raw.userType() == QMetaType::QByteArray && raw.toByteArray().startsWith(magicString)) {
+                continue;
+            }
+            if (!setValue(key, value(key))) {
+                qCritical() << "SecureQSettings: could not encrypt" << key << "- it stays as it was until the keychain answers";
             }
         }
-        m_settings.setValue("Conf/encrypted", true);
     }
 }
 
@@ -84,7 +94,7 @@ QVariant SecureQSettings::value(const QString &key, const QVariant &defaultValue
     return retVal;
 }
 
-void SecureQSettings::setValue(const QString &key, const QVariant &value)
+bool SecureQSettings::setValue(const QString &key, const QVariant &value)
 {
     QMutexLocker locker(&m_mutex);
 
@@ -99,8 +109,10 @@ void SecureQSettings::setValue(const QString &key, const QVariant &value)
             QByteArray encryptedValue = encryptText(decryptedValue);
             m_settings.setValue(key, magicString + encryptedValue);
         } else {
+            // Nothing is written, and the caller is told: a value that must be encrypted is never
+            // stored in plain text instead.
             qCritical() << "SecureQSettings::setValue Encryption required, but key is empty";
-            return;
+            return false;
         }
 
     } else {
@@ -108,6 +120,7 @@ void SecureQSettings::setValue(const QString &key, const QVariant &value)
     }
 
     m_cache.insert(key, value);
+    return true;
 }
 
 void SecureQSettings::remove(const QString &key)
@@ -127,7 +140,10 @@ QByteArray SecureQSettings::backupAppConfig() const
     const auto needToBackup = [this](const auto &key) {
       for (const auto &item : m_fieldsToBackup)
       {
-        if (key == "Conf/installationUuid")
+        // AresVPN Client: the session carries the account's credential; a backup file is not
+        // a place for it, and restoring one onto another device would be a second device on
+        // this one's sign-in.
+        if (key == "Conf/installationUuid" || key == "Conf/aresSession")
         {
           return false;
         }
@@ -163,10 +179,9 @@ bool SecureQSettings::restoreAppConfig(const QByteArray &json)
         return false;
 
     for (const QString &key : cfg.keys()) {
-        if (key == "Conf/installationUuid") {
+        if (key == "Conf/installationUuid" || key == "Conf/aresSession") {
             continue;
         }
-
         setValue(key, cfg.value(key).toVariant());
     }
 

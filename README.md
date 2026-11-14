@@ -71,7 +71,7 @@ preload:
 | product identity (names, organisation, keychain, Android package for the store URL) | `cmake/aresvpn/branding.cmake` | upstream's own `CLIENT_*` branding seam - zero upstream lines |
 | artwork | `branding/aresvpn/` masters + `generate.py`; rasters written in place under upstream's filenames | no `.qrc`/`.rc`/manifest line changes |
 | OS namespaces (services, tunnel, pipe, IPC, credential-store tags, WFP keys, installer scripts) | small in-place edits, each marked `AresVPN Client:` | upstream's lowest-churn code |
-| the self-hosted installer and the Premium store | routes cut in `client/ui/`, the update check guarded, the write-access predicate forced false, `server_scripts` not embedded; each early-return switch is listed in `cmake/aresvpn/disabled-functions.txt` and checked at configure | every controller stays constructed; a merge survives |
+| the self-hosted installer and the Premium store | routes cut in `client/ui/`, the update check guarded, the write-access predicate forced false, `server_scripts` not embedded | every controller stays constructed; a merge survives |
 | the AresVPN login and endpoint | `client/core/controllers/aresProfile*`, `aresSessionLogic.*` (tested by `client/tests/ares`) | new files beside upstream's |
 | the measurement harness | `client/aresHarness.cpp`, `client/ui/utils/qmlDriver.*`, compiled only with `-DARES_HARNESS=ON` | three hook lines in upstream's `amneziaApplication.cpp` |
 

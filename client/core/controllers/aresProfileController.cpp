@@ -337,7 +337,9 @@ AresProfileController::Result AresProfileController::importReply(const Reply &re
         return result;
     case 409:
         result.errorCode = ErrorCode::AresEndpointUnreachable;
-        result.message = tr("The console could not add this device to the rent. Try again later, or contact support.");
+        result.message = body.value(QStringLiteral("error")).toString() == QLatin1String("device limit reached")
+                ? tr("This rent is at its device limit. Remove a device it no longer uses on its devices page in the console, or contact support.")
+                : tr("The console could not add this device to the rent. Try again later, or contact support.");
         return result;
     case 429:
         result.errorCode = ErrorCode::AresEndpointUnreachable;

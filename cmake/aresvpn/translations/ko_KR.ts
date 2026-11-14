@@ -451,6 +451,10 @@ The same texts are installed beside the program&apos;s executable, and the compl
         <translation>콘솔이 이 기기를 렌트에 추가하지 못했습니다. 나중에 다시 시도하거나 지원팀에 문의하세요.</translation>
     </message>
     <message>
+        <source>This rent is at its device limit. Remove a device it no longer uses on its devices page in the console, or contact support.</source>
+        <translation>이 렌트는 기기 수 한도에 도달했습니다. 콘솔의 기기 페이지에서 더 이상 쓰지 않는 기기를 삭제하거나 지원팀에 문의하세요.</translation>
+    </message>
+    <message>
         <source>Too many attempts - wait a minute and try again.</source>
         <translation>시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.</translation>
     </message>

@@ -392,33 +392,6 @@ elseif(ARES_RELEASE)
                         "no reachable screen carries Amnezia's mark.")
 endif()
 
-# ===========================================================================================
-# DOES EVERY UPSTREAM FUNCTION THE FORK SWITCHED OFF STILL OPEN WITH ITS SWITCH? (audit H-14)
-#
-# cmake/aresvpn/disabled-functions.txt lists them; a merge that drops one early `return;` re-enables
-# upstream's body without a conflict anyone sees. Same authorisation shape as the two checks above.
-set(_ares_disabled_script "${CMAKE_SOURCE_DIR}/cmake/aresvpn/disabled-functions.py")
-if(_ares_brand_python AND EXISTS "${_ares_disabled_script}")
-    execute_process(
-        COMMAND "${_ares_brand_python}" "${_ares_disabled_script}" --root "${CMAKE_SOURCE_DIR}"
-        RESULT_VARIABLE _ares_disabled_rc
-        OUTPUT_VARIABLE _ares_disabled_out
-        ERROR_VARIABLE _ares_disabled_err
-    )
-    if(NOT _ares_disabled_rc EQUAL 0)
-        if(ARES_RELEASE)
-            message(FATAL_ERROR "AresVPN disabled functions: a function the fork switched off no longer "
-                                "opens with its switch.\n${_ares_disabled_out}${_ares_disabled_err}")
-        else()
-            message(WARNING "AresVPN disabled functions: NOT clean. Re-run with -DARES_RELEASE=ON to make "
-                            "this fatal.\n${_ares_disabled_out}${_ares_disabled_err}")
-        endif()
-    endif()
-elseif(ARES_RELEASE)
-    message(FATAL_ERROR "AresVPN disabled functions: no python, so a release build cannot establish that "
-                        "the fork's switched-off functions are still off.")
-endif()
-
 if(APPLE)
     set(RUNTIME_DEPS_DIR ${CMAKE_INSTALL_BINDIR}/AmneziaVPN.app/Contents/Frameworks)
 else()

@@ -289,16 +289,6 @@ QString SecureAppSettingsRepository::getAresEndpoint() const
     return value("Conf/aresEndpoint", QString()).toString();
 }
 
-void SecureAppSettingsRepository::setAresEndpoint(const QString &endpoint)
-{
-    setValue("Conf/aresEndpoint", endpoint.trimmed());
-}
-
-void SecureAppSettingsRepository::resetAresEndpoint()
-{
-    setValue("Conf/aresEndpoint", QString());
-}
-
 // AresVPN Client: the rent expiry map, serverId -> ISO-8601 string, exactly as /api/profile
 // returned it. Kept beside the servers rather than inside a ServerDescription, so core keeps
 // upstream's shape (#D178). An empty return means "we were never told", which the UI shows as

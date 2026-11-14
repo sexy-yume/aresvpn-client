@@ -62,6 +62,10 @@
         <translation>연결 끊기</translation>
     </message>
     <message>
+        <source>Cancel</source>
+        <translation>취소</translation>
+    </message>
+    <message>
         <source>This version is no longer supported. Install version %1 to connect again.</source>
         <translation>이 버전은 더 이상 지원되지 않습니다. 다시 연결하려면 %1 버전을 설치하세요.</translation>
     </message>

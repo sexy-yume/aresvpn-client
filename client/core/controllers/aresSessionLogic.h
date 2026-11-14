@@ -1,0 +1,60 @@
+// AresVPN Client - the decisions the login session makes, with no network, no storage and no Qt GUI.
+// Copyright (c) 2026 AresVPN. Licensed under the GNU General Public License v3.0 (see LICENSE).
+//
+// AresProfileController does the I/O; every rule it applies to what came back lives here, so the
+// rules run under `client/tests/ares` without a console, a keychain or an application object
+// (audit 2026-11-14 H-17). Depends on QtCore only - keep it that way, or the test target stops
+// being buildable on its own.
+#ifndef ARESSESSIONLOGIC_H
+#define ARESSESSIONLOGIC_H
+
+#include <QByteArray>
+#include <QString>
+#include <QVariantMap>
+
+namespace aresSession
+{
+    // What the console's update manifest says about this build (plan 28).
+    struct UpdateInfo
+    {
+        QString latest;         // the newest version for this platform
+        QString url;            // where to get it (https only)
+        bool available = false; // latest is newer than this build
+        bool required = false;  // this build is older than min_version: Connect is refused
+    };
+
+    // What identifies this device's tunnel in a profile: a SHA-256 of the text minus its `#`
+    // comment lines. A renewal rewrites only the comment (`# ARES rent X device Y - expires ...`),
+    // so it is no change. Never the text itself: the text holds the device's private key.
+    QString identityDigest(const QString &text);
+
+    // `base` with what a successful answer changed: server, device, identity, ETag, and a device
+    // token in place of the password when the console issued one (D268).
+    QVariantMap withAnswer(QVariantMap base, const QString &serverId, const QString &deviceId,
+                           const QString &identity, const QString &etag, const QString &refreshToken);
+
+    // The manifest `body` judged for `platform` against `currentVersion`. A usable entry needs a
+    // parseable `latest` and an https `url`; anything else is the empty UpdateInfo and `false`.
+    bool judgeManifest(const QByteArray &body, const QString &platform, const QString &currentVersion,
+                       UpdateInfo *out);
+
+    // The label a device carries on the console's device page (plan 24, D238): the host name, the
+    // phone's model where the host name says nothing (Android answers "localhost"), the OS name as
+    // the last resort - "Android 14" names every phone on that release alike (H-11). At most 64.
+    QString chooseDeviceName(const QString &hostName, const QString &model, const QString &productName);
+
+    // The device key an Android installation sends as `device`, derived from Settings.Secure
+    // ANDROID_ID so an uninstall and reinstall under the same signing key and user is the SAME
+    // device on the console rather than a new one with a new key and a new inner address (H-12).
+    // Empty when there is no id, and the caller falls back to the stored installation uuid.
+    // The shape fits the console's DEVICE_SHAPE, `^[A-Za-z0-9-]{8,64}$`.
+    QString deviceKeyFromAndroidId(const QString &androidId);
+
+    // Whether an answer must be written into the server list. The list is encrypted and a write
+    // resets the UI model, so a poll that brought back exactly the stored profile writes nothing
+    // (H-18). `stored` says the server is in the list at all - a missing one is always written.
+    bool serverNeedsWrite(bool stored, const QString &sessionServerId, const QString &sessionIdentity,
+                          const QString &serverId, const QString &identity);
+}
+
+#endif // ARESSESSIONLOGIC_H

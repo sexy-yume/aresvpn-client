@@ -16,13 +16,23 @@
 # conflict for ever, and the seam that avoids one already exists - upstream added the branding
 # CLIENT_* variables themselves, and every one of them is read behind an `if(NOT CLIENT_...)`.
 #
-# NOTHING HERE MAY BE CONVEYED. #D178 forbids an Android binary while ML Kit is linked, and the
-# signing key its release build needs is a throwaway made by the caller.
+# NOTHING HERE MAY BE CONVEYED YET: the signing key its release build needs is a throwaway made by
+# the caller (plan 18 T03). ML Kit, which #D178 also barred, is gone (#D188).
+#
+# ARES_RELEASE=1 configures a build meant to be conveyed: -DARES_RELEASE=ON makes the source-revision
+# and brand checks fatal and -DARES_HARNESS=OFF compiles the test harness out (audit 2026-11-14 H-19,
+# H-20). Without it this is a dev build with the harness in. Both flags are passed every time, so a
+# cache left by the other mode never decides.
 set -eu
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-${ROOT}/deploy/build-android}"
 ABI="${ABI:-arm64-v8a}"
+if [ "${ARES_RELEASE:-0}" = "1" ]; then
+    MODE=release; MODE_FLAGS=(-DARES_RELEASE=ON -DARES_HARNESS=OFF)
+else
+    MODE=dev; MODE_FLAGS=(-DARES_RELEASE=OFF -DARES_HARNESS=ON)
+fi
 
 : "${QT_ROOT_PATH:?set QT_ROOT_PATH, e.g. /opt/Qt/6.10.3}"
 : "${QT_HOST_PATH:?set QT_HOST_PATH, e.g. /opt/Qt/6.10.3/gcc_64 - a cross build runs the HOST Qt tools}"
@@ -48,10 +58,12 @@ echo "abi:       $ABI  ($QT_ABI_DIR)"
 echo "platform:  $ANDROID_PLATFORM"
 echo "ndk:       $ANDROID_NDK_ROOT"
 echo "host qt:   $QT_HOST_PATH"
+echo "mode:      $MODE  (${MODE_FLAGS[*]})"
 
 cmake -S "$ROOT" -B "$BUILD_DIR" \
     -C "${ROOT}/cmake/aresvpn/branding.cmake" \
     -G Ninja \
+    "${MODE_FLAGS[@]}" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_PREFIX_PATH="$TOOLCHAIN" \
     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
@@ -69,7 +81,7 @@ echo
 echo "=== the artefact ==="
 found=0
 while IFS= read -r apk; do
-    printf '  %s  %s bytes\n' "$apk" "$(stat -c %s "$apk")"
+    printf '  %s  %s bytes  sha256 %s\n' "$apk" "$(stat -c %s "$apk")" "$(sha256sum "$apk" | cut -d' ' -f1)"
     case "$(basename "$apk")" in
         *AresVPNClient*) found=1 ;;
     esac

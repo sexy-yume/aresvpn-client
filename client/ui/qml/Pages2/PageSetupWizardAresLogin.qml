@@ -18,10 +18,12 @@ PageType {
     id: root
     objectName: "page:PageSetupWizardAresLogin"
 
-    // #D182: with no rent stored this page IS the first screen, so there is nowhere to go back
-    // to and offering the control would be a dead end. Adding a rent from the list still pushes
-    // this page, and there the back button is real.
-    readonly property bool isFirstRun: PageController.isStartPageVisible()
+    // #D187 rule 1: NOT SIGNED IN means this page IS the first screen, so there is nowhere to go back
+    // to and offering the control would be a dead end. Signed in - switching rent, or signing in
+    // again after the console refused the stored sign-in - this page is pushed and the back button
+    // is real. Asked of the session, not of `isStartPageVisible()`: that is the "zero servers" proxy
+    // #D187 says answers the wrong question (a server can be stored with nobody signed in).
+    readonly property bool isFirstRun: !AresProfileController.hasSession
 
     BackButtonType {
         id: backButton

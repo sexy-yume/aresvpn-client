@@ -83,11 +83,20 @@ public:
     QCommandLineOption m_optCleanup;
     QCommandLineOption m_optConnect;
     QCommandLineOption m_optImport;
-    QCommandLineOption m_optAresLogin;  // AresVPN Client: headless login from stdin
-    QCommandLineOption m_optQmlSmoke;   // AresVPN Client: compile every page and report, then exit
-    QCommandLineOption m_optQmlShot;    // AresVPN Client: render named screens to PNG, then exit
-    QCommandLineOption m_optQmlDrive;   // AresVPN Client: click through #D182 and report, then exit
-    QCommandLineOption m_optFontReport; // AresVPN Client: what fonts this process can actually see
+
+#ifdef ARES_HARNESS
+    // AresVPN Client: the measurement modes, compiled in only with -DARES_HARNESS=ON and never into
+    // a release build (client/CMakeLists.txt refuses ARES_RELEASE with ARES_HARNESS; audit H-19).
+    // Defined in aresHarness.cpp, so upstream's file carries three hook lines and nothing else.
+    QCommandLineOption m_optAresLogin {QStringLiteral("ares-login"), QStringLiteral("AresVPN Client: read id, password and idx as three lines from stdin, store the rent, exit")};
+    QCommandLineOption m_optQmlSmoke {QStringLiteral("qml-smoke"), QStringLiteral("AresVPN Client: compile every page in PageEnum, print any QML error, exit 4 if any failed")};
+    QCommandLineOption m_optQmlShot {QStringLiteral("qml-shot"), QStringLiteral("AresVPN Client: navigate to each named page and write a PNG of the window into <dir>, then exit"), QStringLiteral("dir")};
+    QCommandLineOption m_optQmlDrive {QStringLiteral("qml-drive"), QStringLiteral("AresVPN Client: click through the #D182 walkthrough, writing a PNG per step into <dir>, then exit"), QStringLiteral("dir")};
+    QCommandLineOption m_optFontReport {QStringLiteral("font-report"), QStringLiteral("AresVPN Client: list the font families this process can see and whether they carry Hangul, then exit")};
+    void addHarnessOptions();
+    void runHarnessBeforeLoad();  // --ares-login: exits when set
+    void runHarnessAfterLoad();   // --qml-smoke, --qml-shot, --font-report, --qml-drive: exit when set
+#endif
 
     QSharedPointer<VpnConnection> m_vpnConnection;
     QThread m_vpnConnectionThread;

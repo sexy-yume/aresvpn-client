@@ -10,13 +10,23 @@
 ::   3. Strawberry's cmake defaults to the Ninja generator; it is dropped from PATH, VS's cmake is used.
 ::   4. A CP949 system code page makes OpenVPN's /WX fatal on a UTF-8 comment: CL=/utf-8.
 ::
-:: Usage:  deploy\aresvpn\build_windows.cmd            (Release, no installer)
+:: Usage:  deploy\aresvpn\build_windows.cmd            (Release config, no installer; a DEV build:
+::                                                      -DARES_HARNESS=ON, so --qml-* and --ares-login run)
+::         deploy\aresvpn\build_windows.cmd release    (a build meant to be CONVEYED: -DARES_RELEASE=ON
+::                                                      makes the source-revision and brand checks fatal,
+::                                                      -DARES_HARNESS=OFF compiles the harness out;
+::                                                      package_windows.cmd packages only this kind)
 ::         (an underscore, not a hyphen: upstream's .gitignore:29 `*build-*` would ignore this file)
+:: Both flags are passed EXPLICITLY every time, so a cache left by the other mode never decides.
 :: Env:    ARES_CLIENT_VENV, PY314, VCVARS_PATH, QT_ROOT_PATH override the defaults below.
 setlocal
 set "ROOT=%~dp0..\.."
 for %%I in ("%ROOT%") do set "ROOT=%%~fI"
 set "BUILD_DIR=%ROOT%\deploy\build"
+set "ARES_MODE_FLAGS=-DARES_RELEASE=OFF -DARES_HARNESS=ON"
+set "ARES_MODE=dev"
+if /i "%~1"=="release" ( set "ARES_MODE_FLAGS=-DARES_RELEASE=ON -DARES_HARNESS=OFF" & set "ARES_MODE=release" )
+if not "%~1"=="" if /i not "%~1"=="release" ( echo FATAL: unknown argument "%~1" - the only one is "release". & exit /b 2 )
 if not defined PY314 set "PY314=%LOCALAPPDATA%\Programs\Python\Python314\python.exe"
 if not defined ARES_CLIENT_VENV set "ARES_CLIENT_VENV=%LOCALAPPDATA%\ares-client-venv314"
 if not defined VCVARS_PATH set "VCVARS_PATH=%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
@@ -44,13 +54,20 @@ conan --version || exit /b 8
 
 call "%VCVARS_PATH%" amd64 || exit /b 4
 cd /d "%ROOT%" || exit /b 9
-echo START %DATE% %TIME%  root=%ROOT%
-cmake -S "%ROOT%" -B "%BUILD_DIR%" -C "%ROOT%\cmake\aresvpn\branding.cmake" -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=%QT_ROOT_PATH%\msvc2022_64" "-DCMAKE_VS_GLOBALS=UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true" || goto :fail
+echo START %DATE% %TIME%  root=%ROOT%  mode=%ARES_MODE%
+cmake -S "%ROOT%" -B "%BUILD_DIR%" -C "%ROOT%\cmake\aresvpn\branding.cmake" %ARES_MODE_FLAGS% -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=%QT_ROOT_PATH%\msvc2022_64" "-DCMAKE_VS_GLOBALS=UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true" || goto :fail
+if exist "%BUILD_DIR%\SHA256SUMS.txt" del "%BUILD_DIR%\SHA256SUMS.txt"
 cmake --build "%BUILD_DIR%" --config Release -- /m || goto :fail
 set "RC=0"
 if not exist "%BUILD_DIR%\client\Release\AresVPNClient.exe" ( echo FAIL: AresVPNClient.exe is ABSENT after a green build - the branding preload did not take & set "RC=7" )
 if not exist "%BUILD_DIR%\service\server\Release\AresVPNClient-service.exe" ( echo FAIL: AresVPNClient-service.exe is ABSENT & set "RC=7" )
-echo END %DATE% %TIME% RC=%RC%
+:: What was built, by content: SHA256SUMS.txt beside the build, so an artefact handed on later can be
+:: matched to this run (audit H-20). A missing hash file is a failure, not a footnote.
+if "%RC%"=="0" (
+    powershell -NoProfile -Command "Get-FileHash -Algorithm SHA256 '%BUILD_DIR%\client\Release\AresVPNClient.exe','%BUILD_DIR%\service\server\Release\AresVPNClient-service.exe' | ForEach-Object { $_.Hash.ToLower() + '  ' + (Split-Path $_.Path -Leaf) } | Set-Content -Encoding ascii '%BUILD_DIR%\SHA256SUMS.txt'"
+    if not exist "%BUILD_DIR%\SHA256SUMS.txt" ( echo FAIL: no SHA256SUMS.txt was written & set "RC=7" ) else ( type "%BUILD_DIR%\SHA256SUMS.txt" )
+)
+echo END %DATE% %TIME% RC=%RC% mode=%ARES_MODE%
 dir /b "%BUILD_DIR%\client\Release\*.exe" "%BUILD_DIR%\service\server\Release\*.exe" 2>nul
 echo BUILD-DONE RC=%RC%
 exit /b %RC%

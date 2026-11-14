@@ -311,9 +311,11 @@ PageType {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 52
 
-                // A live tunnel can always be closed; opening one is refused below min_version.
-                enabled: root.hasRent && !root.busy && (root.connected || !root.updateRequired)
-                text: root.busy ? ConnectionController.connectionStateText
+                // A live or starting tunnel can always be closed - a connection stuck in Connecting is
+                // cancelled here, as upstream's ConnectButton allows (H-9); opening one needs a rent
+                // and is refused below min_version.
+                enabled: root.busy || root.connected || (root.hasRent && !root.updateRequired)
+                text: root.busy ? qsTr("Cancel")
                                 : (root.connected ? qsTr("Disconnect") : qsTr("Connect"))
 
                 defaultColor: root.connected ? AresStyle.color.transparent : AresStyle.color.accent
@@ -322,7 +324,7 @@ PageType {
                 borderColor: AresStyle.color.lineStrong
 
                 clickedFunc: function() {
-                    if (!root.hasRent) {
+                    if (!root.hasRent && !root.busy && !root.connected) {
                         PageController.goToPage(PageEnum.PageSetupWizardAresLogin)
                         return
                     }

@@ -14,6 +14,7 @@
 
 class QTimer;
 
+#include "core/controllers/aresSessionLogic.h"
 #include "core/utils/errorCodes.h"
 
 class ImportController;
@@ -37,28 +38,22 @@ public:
         int httpStatus = 0;    // the console's status; 0 when it never answered
         bool noAnswer = false; // no HTTP answer and no TLS failure: the request never got through
         bool notModified = false; // 304 to a token refresh: nothing changed, nothing was imported
+        bool superseded = false;  // the session was signed in or out while a background refresh
+                                  // was on the wire; its answer was dropped, nothing was written
         QString refreshToken;  // a device token, from a console that issues them (plan 28); else empty
         QString etag;          // the console's ETag for this profile, sent back as If-None-Match
     };
 
-    // What the console's update manifest says about this build (plan 28). Empty while the console
-    // serves no manifest, which is today: every field false or empty, nothing shown.
-    struct UpdateInfo
-    {
-        QString latest;        // the newest version for this platform
-        QString url;           // where to get it (https only)
-        bool available = false; // latest is newer than this build
-        bool required = false;  // this build is older than min_version: Connect is refused
-    };
+    using UpdateInfo = aresSession::UpdateInfo;
 
     explicit AresProfileController(ImportController *importController,
                                    SecureServersRepository *serversRepository,
                                    SecureAppSettingsRepository *appSettingsRepository,
                                    QObject *parent = nullptr);
 
-    // Synchronous: POSTs, waits with a QEventLoop (the shape every QML "busy indicator" slot in
-    // this tree already uses), imports, returns. Never throws; the Result says what happened.
-    // `timeoutMsecs` 0 is the default transfer timeout.
+    // Synchronous: POSTs, waits with a QEventLoop that holds back user input (the shape every QML
+    // "busy indicator" slot in this tree already uses), imports, returns. Never throws; the Result
+    // says what happened. `timeoutMsecs` 0 is the default transfer timeout.
     Result fetchAndImport(const QString &id, const QString &password, const QString &idx, int timeoutMsecs = 0);
 
     // The console's base URL, e.g. https://console.ares-vpn.org:8080 - from settings, or the
@@ -78,8 +73,9 @@ public:
     // product's own storage.
     void forgetRentExpiry(const QString &serverId);
 
-    // Builds the Xray JSON the importer stores for a socks5 rent from its socks5h:// URI. Public
-    // so the shape can be checked without a network.
+    // Builds the Xray JSON the importer stores for a socks5 rent from its socks5h:// URI. Static and
+    // network-free, but NOT under client/tests/ares: it builds on upstream's Xray serialization,
+    // which that QtCore-only target does not compile.
     static QString xrayConfigForSocks5(const QString &uri, QString *errorOut);
 
     // ---- THE LOGIN SESSION (AresProject #D187) ------------------------------------------------
@@ -113,7 +109,13 @@ public:
     // `changed` is set when the stored server was replaced, which is the signal to hot-reload.
     // A 404 (the rent behind the idx is gone and nothing has replaced it yet) is NOT a logout:
     // the session stands, the caller is told, and the next poll picks up the replacement.
-    Result refreshSession(bool *changed = nullptr, int timeoutMsecs = 0);
+    //
+    // `userWaiting` is true only where a customer pressed something and watches a busy indicator.
+    // Every other refresh - the poll, the one before auto-connect, the one a stalled tunnel runs -
+    // leaves user input flowing while it waits (H-13: a 30 s timeout through a dead tunnel used to
+    // freeze every click, Disconnect included), and an answer that arrives after the customer
+    // signed in or out meanwhile is dropped (`Result::superseded`) rather than written over them.
+    Result refreshSession(bool *changed = nullptr, int timeoutMsecs = 0, bool userWaiting = false);
 
     // Forget the session and remove the server it owns.
     void logoutSession();
@@ -160,31 +162,44 @@ private:
         QString transportError;   // non-empty when the request never got an HTTP answer
         bool sslError = false;
     };
-    // GET when `jsonBody` is null, POST otherwise.
-    Reply request(const QString &url, const QByteArray &jsonBody, int timeoutMsecs, const QByteArray &ifNoneMatch = {});
+    // What a refresh carries into the import: the session as it was when the request left, and its
+    // generation, so an answer that outlived a sign-in or sign-out is recognised and dropped.
+    struct RefreshContext
+    {
+        QVariantMap session;
+        quint64 generation = 0;
+    };
+
+    // GET when `jsonBody` is null, POST otherwise. `allowUserInput` leaves clicks flowing while it
+    // waits - for requests nobody is watching (H-13).
+    Reply request(const QString &url, const QByteArray &jsonBody, int timeoutMsecs,
+                  const QByteArray &ifNoneMatch = {}, bool allowUserInput = false);
+
+    // The password request behind fetchAndImport, and behind the refresh of a session stored before
+    // the console issued tokens; `refresh` is null for a sign-in.
+    Result passwordFetch(const QString &id, const QString &password, const QString &idx, int timeoutMsecs,
+                         const RefreshContext *refresh, bool allowUserInput);
 
     // The refresh with a device token instead of the password (plan 28): no scrypt on the console.
-    Result refreshWithToken(const QString &token, const QString &idx, const QString &etag, int timeoutMsecs);
+    Result refreshWithToken(const QString &token, const QString &idx, const QString &etag, int timeoutMsecs,
+                            const RefreshContext *refresh, bool allowUserInput);
 
-    // Status -> Result, and on 200 the import. `viaToken` changes only what a 401 means.
-    Result importReply(const Reply &reply, const QString &alias, bool viaToken);
+    // Status -> Result, and on 200 the import. `viaToken` changes only what a 401 means; `refresh`
+    // is null for a sign-in, and for a refresh it decides whether the answer is still wanted and
+    // whether the server list needs writing at all (H-18).
+    Result importReply(const Reply &reply, const QString &alias, bool viaToken, const RefreshContext *refresh);
+
+    // The `device` this installation sends: on Android derived from ANDROID_ID, so a reinstall is
+    // the same device (H-12); elsewhere, and where Android gives no id, the stored installation uuid.
+    QString deviceKey() const;
 
     // Replace the server the session owns, removing the previous one and its expiry with it
     // (#L023's residue rule, applied to the product's own storage).
     void adoptServer(const QString &newServerId, const QString &previousServerId);
 
-    // `base` with what a successful answer changed: server, device, identity, ETag, and a device
-    // token in place of the password when the console issued one.
-    static QVariantMap sessionWith(QVariantMap base, const Result &r);
-
-    // The label this device carries on the console's device page (plan 24): the host name, or the
-    // product name where the host name says nothing (Android answers "localhost"). At most 64.
+    // The label this device carries on the console's device page (plan 24): see
+    // aresSession::chooseDeviceName, fed with the platform's host name, model and OS name.
     static QString deviceName();
-
-    // What identifies this device's tunnel in a profile: a digest of the text minus its `#` comment
-    // lines. A renewal rewrites only the comment (`# ARES rent X device Y - expires ...`), so it is
-    // no change. Persisted with the session, so refreshSession compares across restarts.
-    static QString identityDigest(const QString &text);
 
     ImportController *m_importController;
     SecureServersRepository *m_serversRepository;
@@ -192,6 +207,8 @@ private:
     QTimer *m_pollTimer = nullptr;
     QTimer *m_updateTimer = nullptr;
     bool m_refreshing = false;
+    // Bumped by every sign-in and sign-out; a background refresh compares it before it writes.
+    quint64 m_sessionGeneration = 0;
     bool m_signInNeeded = false;
     UpdateInfo m_updateInfo;
 };

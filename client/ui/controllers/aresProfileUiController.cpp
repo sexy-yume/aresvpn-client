@@ -123,7 +123,8 @@ bool AresProfileUiController::refreshNow()
         return false;
     }
     bool changed = false;
-    const AresProfileController::Result r = m_controller->refreshSession(&changed);
+    // The customer pressed "Check now" and watches the busy indicator: input waits with them.
+    const AresProfileController::Result r = m_controller->refreshSession(&changed, 0, true);
     if (r.errorCode != amnezia::ErrorCode::NoError) {
         m_lastError = r.message.isEmpty() ? errorString(r.errorCode) : r.message;
         emit lastErrorChanged();

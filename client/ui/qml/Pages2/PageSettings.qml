@@ -2,17 +2,17 @@
 // Copyright (c) 2026 AresVPN. Licensed under the GNU General Public License v3.0 (see LICENSE).
 //
 // Upstream's index had seven entries because upstream's customer administers a server they
-// installed and may hold a Premium subscription. Ours holds RENTS. Three groups are left, and
-// #D182 is the test each one had to pass: does it keep "press Connect and it works" true?
+// installed and may hold a Premium subscription. Ours holds ONE SESSION (#D187). Three groups are
+// left, and #D182 is the test each one had to pass: does it keep "press Connect and it works" true?
 //
-//   Rents       - the rents on this device. The same screen the home row opens, so there is one
-//                 place a rent is added, switched or removed and not two.
+//   Account     - who is signed in, which idx, and the rent behind it: the same session screen the
+//                 home row opens, so there is one place to switch or sign out and not two.
 //   Connection  - what the tunnel does to this machine: kill switch, split tunnelling, DNS.
 //   Application - what the app does to itself: language, autostart, notifications, logging.
 //
 // REMOVED, each because it is dead for this product rather than because it is untidy:
 //   Servers          -> upstream's server list is the SSH/container machinery of a self-hosted
-//                       install. Replaced by Rents, which is the same idea for what we sell.
+//                       install. Replaced by the session (Account), which is what we sell.
 //   News & Notifications -> the Premium news feed. Its own `isVisible` is
 //                       `ServersUiController.hasServersFromGatewayApi`, which is false for every
 //                       rent this client can hold, so it was already invisible - it comes out of

@@ -28,6 +28,7 @@ set(HEADERS ${HEADERS}
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/exportController.h
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/importController.h
     ${CLIENT_ROOT_DIR}/core/controllers/aresProfileController.h
+    ${CLIENT_ROOT_DIR}/core/controllers/aresSessionLogic.h
     ${CLIENT_ROOT_DIR}/core/installers/installerBase.h
     ${CLIENT_ROOT_DIR}/core/installers/awgInstaller.h
     ${CLIENT_ROOT_DIR}/core/installers/wireguardInstaller.h
@@ -57,7 +58,6 @@ set(HEADERS ${HEADERS}
     ${CLIENT_PAGE_ENUM_HEADER}
     ${CLIENT_ROOT_DIR}/ui/utils/qAutoStart.h
     ${CLIENT_ROOT_DIR}/ui/utils/mtProxyPublicHostInput.h
-    ${CLIENT_ROOT_DIR}/ui/utils/qmlDriver.h  # AresVPN Client: the --qml-drive walkthrough
     ${CLIENT_ROOT_DIR}/core/protocols/vpnProtocol.h
     ${CMAKE_CURRENT_BINARY_DIR}/version.h
     ${CLIENT_ROOT_DIR}/core/utils/selfhosted/sshClient.h
@@ -113,6 +113,7 @@ set(SOURCES ${SOURCES}
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/usersController.cpp
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/installController.cpp
     ${CLIENT_ROOT_DIR}/core/controllers/aresProfileController.cpp
+    ${CLIENT_ROOT_DIR}/core/controllers/aresSessionLogic.cpp
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/exportController.cpp
     ${CLIENT_ROOT_DIR}/core/controllers/selfhosted/importController.cpp
     ${CLIENT_ROOT_DIR}/core/installers/installerBase.cpp
@@ -141,7 +142,6 @@ set(SOURCES ${SOURCES}
     ${CLIENT_ROOT_DIR}/core/repositories/secureAppSettingsRepository.cpp
     ${CLIENT_ROOT_DIR}/ui/utils/qAutoStart.cpp
     ${CLIENT_ROOT_DIR}/ui/utils/mtProxyPublicHostInput.cpp
-    ${CLIENT_ROOT_DIR}/ui/utils/qmlDriver.cpp  # AresVPN Client
     ${CLIENT_ROOT_DIR}/core/protocols/vpnProtocol.cpp
     ${CLIENT_ROOT_DIR}/core/utils/selfhosted/sshClient.cpp
     ${CLIENT_ROOT_DIR}/core/utils/networkUtilities.cpp

@@ -13,12 +13,18 @@
 :: NOT a patch to deploy\build.bat: #D177 rule 3. Every upstream file this fork edits is a merge
 :: conflict for ever, and cmake\CPack.cmake is already fork-owned for the branding.
 ::
-:: NOTHING PRODUCED HERE MAY BE CONVEYED. #D178 makes the source public no later than the first
-:: binary leaves our hands, and the repository is still private; there is also no signing identity,
-:: so this installer and the binaries inside it are UNSIGNED and Windows will say so loudly.
+:: THE GATES ARE ENFORCED HERE, not remembered (audit 2026-11-14 H-20). The build must have been
+:: configured as a release - `deploy\aresvpn\build_windows.cmd release`, which sets ARES_RELEASE=ON
+:: (the source-revision and brand checks fatal) and ARES_HARNESS=OFF (no test driver in a customer's
+:: binary) - or this script refuses. And it refuses an UNSIGNED installer unless the caller says
+:: ARES_ALLOW_UNSIGNED=1 out loud: there is no signing identity yet (plan 18 T03), and an unsigned
+:: installer may be built for measurement but never conveyed. The source is public (#D193), so the
+:: signature is what now stands between this output and a customer.
 ::
 :: Usage:  deploy\aresvpn\package_windows.cmd
 :: Env:    QIF_ROOT_PATH, VCVARS_PATH, BUILD_DIR override the defaults below.
+::         SIGNTOOL_SUBJECT_NAME  the certificate subject cmake\sign_*.cmake signs with (required)
+::         ARES_ALLOW_UNSIGNED=1  build an unsigned installer anyway - for measurement only
 setlocal
 :: The tree is derived from this script's own location, never from a home directory (#L012).
 set "ROOT=%~dp0..\.."
@@ -44,6 +50,27 @@ if not exist "%BUILD_DIR%\CMakeCache.txt" (
 if not exist "%BUILD_DIR%\client\Release\AresVPNClient.exe" (
     echo FATAL: no AresVPNClient.exe in "%BUILD_DIR%\client\Release".
     echo        Either the build has not run, or it ran without -C cmake\aresvpn\branding.cmake.
+    exit /b 2
+)
+:: Configured as a release, without the harness. Read from the cache, which is what cmake used.
+findstr /x /c:"ARES_RELEASE:BOOL=ON" "%BUILD_DIR%\CMakeCache.txt" >nul
+if errorlevel 1 (
+    echo FATAL: "%BUILD_DIR%" was not configured with -DARES_RELEASE=ON, so its source-revision and
+    echo        brand checks were warnings only. Run deploy\aresvpn\build_windows.cmd release first.
+    exit /b 2
+)
+findstr /x /c:"ARES_HARNESS:BOOL=OFF" "%BUILD_DIR%\CMakeCache.txt" >nul
+if errorlevel 1 (
+    echo FATAL: "%BUILD_DIR%" compiles the measurement harness in ^(ARES_HARNESS is not OFF^).
+    echo        Run deploy\aresvpn\build_windows.cmd release first.
+    exit /b 2
+)
+set "ARES_SIGNED=yes"
+if not defined SIGNTOOL_SUBJECT_NAME set "ARES_SIGNED=no"
+if "%ARES_SIGNED%"=="no" if not "%ARES_ALLOW_UNSIGNED%"=="1" (
+    echo FATAL: SIGNTOOL_SUBJECT_NAME is not set, so nothing here would be signed.
+    echo        Set it to the signing certificate's subject, or set ARES_ALLOW_UNSIGNED=1 to build an
+    echo        unsigned installer for measurement - which may then not be conveyed to anyone.
     exit /b 2
 )
 
@@ -114,10 +141,17 @@ if errorlevel 1 (
     echo NOTE: the installer's bytes still carry "AmneziaVPN" - name the occurrences before conveying.
 )
 
+:: The installer by content, so the file handed on can be matched to this run (audit H-20).
+if defined PKG (
+    if exist "%PKG%.sha256" del "%PKG%.sha256"
+    powershell -NoProfile -Command "$h = Get-FileHash -Algorithm SHA256 '%PKG%'; $h.Hash.ToLower() + '  ' + (Split-Path $h.Path -Leaf) | Set-Content -Encoding ascii '%PKG%.sha256'"
+    if exist "%PKG%.sha256" ( type "%PKG%.sha256" ) else ( echo FAIL: no SHA-256 was written for the installer & set "RC=6" )
+)
+
 :report
 echo END %DATE% %TIME% RC=%RC%
 if "%RC%"=="0" ( echo PACKAGE-DONE ) else ( echo PACKAGE-FAILED RC=%RC% )
-echo REMINDER: unsigned, and #D178 forbids handing this to anyone while the repository is private.
+if "%ARES_SIGNED%"=="no" echo REMINDER: UNSIGNED ^(ARES_ALLOW_UNSIGNED=1^) - built for measurement, never to be conveyed.
 exit /b %RC%
 
 :fail

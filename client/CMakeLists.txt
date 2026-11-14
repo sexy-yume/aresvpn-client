@@ -10,12 +10,25 @@ set_property(GLOBAL PROPERTY AUTOGEN_TARGETS_FOLDER "Autogen")
 set_property(GLOBAL PROPERTY AUTOMOC_TARGETS_FOLDER "Autogen")
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "Autogen")
 
+# AresVPN Client (audit 2026-11-14 H-19, H-20). ARES_RELEASE says this build is meant to be
+# conveyed and makes the release checks below fatal; ARES_HARNESS compiles the measurement modes
+# (--qml-*, --ares-login, --font-report: client/aresHarness.cpp) and the Qt private API they need.
+# The two exclude each other: a customer's binary carries no test driver.
+option(ARES_RELEASE "AresVPN: this build is intended to be conveyed; release checks are fatal" OFF)
+option(ARES_HARNESS "AresVPN: compile the measurement harness into the client (never in a release)" OFF)
+if(ARES_RELEASE AND ARES_HARNESS)
+    message(FATAL_ERROR "AresVPN: -DARES_RELEASE=ON with -DARES_HARNESS=ON. A conveyed build must not "
+                        "carry the test harness; configure the release with -DARES_HARNESS=OFF.")
+endif()
+
 set(PACKAGES
     Core Gui Network Xml
     RemoteObjects Quick Svg QuickControls2
     Core5Compat Concurrent LinguistTools
-    GuiPrivate  # AresVPN Client: QWindowSystemInterface, for --qml-drive (18-3h)
 )
+if(ARES_HARNESS)
+    list(APPEND PACKAGES GuiPrivate)  # QWindowSystemInterface, for --qml-drive (18-3h)
+endif()
 
 execute_process(
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -49,8 +62,10 @@ set(LIBS ${LIBS}
     Qt6::Network Qt6::Xml Qt6::RemoteObjects
     Qt6::Quick Qt6::Svg Qt6::QuickControls2
     Qt6::Core5Compat Qt6::Concurrent
-    Qt6::GuiPrivate  # AresVPN Client: QWindowSystemInterface, for --qml-drive (18-3h)
 )
+if(ARES_HARNESS)
+    list(APPEND LIBS Qt6::GuiPrivate)
+endif()
 
 if(WIN32 OR (APPLE AND NOT IOS) OR (LINUX AND NOT ANDROID))
     set(LIBS ${LIBS} Qt6::Widgets)
@@ -237,6 +252,15 @@ target_link_libraries(${PROJECT} PRIVATE ${LIBS})
 target_compile_definitions(${PROJECT} PRIVATE "MZ_$<UPPER_CASE:${MZ_PLATFORM_NAME}>")
 
 target_sources(${PROJECT} PRIVATE ${SOURCES} ${HEADERS} ${RESOURCES} ${QRC} ${I18NQRC})
+if(ARES_HARNESS)
+    # Target-wide, because AmneziaApplication's layout depends on it in every translation unit.
+    target_compile_definitions(${PROJECT} PRIVATE ARES_HARNESS)
+    target_sources(${PROJECT} PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/aresHarness.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ui/utils/qmlDriver.h
+        ${CMAKE_CURRENT_LIST_DIR}/ui/utils/qmlDriver.cpp
+    )
+endif()
 
 # Finalize the executable so Qt can gather/deploy QML modules and plugins correctly (Android needs this).
 if(COMMAND qt_import_qml_plugins)
@@ -366,6 +390,33 @@ if(_ares_brand_python AND EXISTS "${_ares_brand_script}")
 elseif(ARES_RELEASE)
     message(FATAL_ERROR "AresVPN brand check: no python, so a release build cannot establish that "
                         "no reachable screen carries Amnezia's mark.")
+endif()
+
+# ===========================================================================================
+# DOES EVERY UPSTREAM FUNCTION THE FORK SWITCHED OFF STILL OPEN WITH ITS SWITCH? (audit H-14)
+#
+# cmake/aresvpn/disabled-functions.txt lists them; a merge that drops one early `return;` re-enables
+# upstream's body without a conflict anyone sees. Same authorisation shape as the two checks above.
+set(_ares_disabled_script "${CMAKE_SOURCE_DIR}/cmake/aresvpn/disabled-functions.py")
+if(_ares_brand_python AND EXISTS "${_ares_disabled_script}")
+    execute_process(
+        COMMAND "${_ares_brand_python}" "${_ares_disabled_script}" --root "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE _ares_disabled_rc
+        OUTPUT_VARIABLE _ares_disabled_out
+        ERROR_VARIABLE _ares_disabled_err
+    )
+    if(NOT _ares_disabled_rc EQUAL 0)
+        if(ARES_RELEASE)
+            message(FATAL_ERROR "AresVPN disabled functions: a function the fork switched off no longer "
+                                "opens with its switch.\n${_ares_disabled_out}${_ares_disabled_err}")
+        else()
+            message(WARNING "AresVPN disabled functions: NOT clean. Re-run with -DARES_RELEASE=ON to make "
+                            "this fatal.\n${_ares_disabled_out}${_ares_disabled_err}")
+        endif()
+    endif()
+elseif(ARES_RELEASE)
+    message(FATAL_ERROR "AresVPN disabled functions: no python, so a release build cannot establish that "
+                        "the fork's switched-off functions are still off.")
 endif()
 
 if(APPLE)

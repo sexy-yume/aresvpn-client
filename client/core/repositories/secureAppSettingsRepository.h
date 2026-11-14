@@ -65,10 +65,9 @@ public:
     void toggleDevGatewayEnv(bool enabled);
     QByteArray readGatewayProxyUrls(const QString &cacheKey) const;
 
-    // AresVPN Client: the console's base URL (Conf/aresEndpoint), empty = the compiled default
+    // AresVPN Client: the console's base URL (Conf/aresEndpoint), empty = the compiled default.
+    // Read-only by design: no screen sets it; a test console is configured by hand.
     QString getAresEndpoint() const;
-    void setAresEndpoint(const QString &endpoint);
-    void resetAresEndpoint();
 
     // AresVPN Client: a rent EXPIRES, which is the one thing about our product that upstream's
     // server model has no field for. Rather than thread a new column through ServerDescription and

@@ -1,7 +1,7 @@
 # AresVPN Client - the product identity, applied through upstream's own branding seam.
 #
 # This is a CMake CACHE PRELOAD script: pass it as `cmake -C cmake/aresvpn/branding.cmake ...`
-# (deploy/aresvpn/build-windows.cmd does). Every CLIENT_* variable below is read by
+# (deploy/aresvpn/build_windows.cmd and build_android.sh do). Every CLIENT_* variable below is read by
 # client/cmake/branding/*.cmake behind an `if(NOT CLIENT_...)` guard, so a value present in the
 # cache before the project runs wins and NO upstream file is edited for it. That is the whole
 # point: upstream added this seam in b1a37b37 ("feat: add brandings"), and a fork that sets the
@@ -19,8 +19,9 @@ set(CLIENT_ORGANIZATION_NAME  "AresVPN"                CACHE STRING "QSettings o
 set(CLIENT_APP_INSTANCE_NAME  "AresVPNClientInstance"  CACHE STRING "Single-instance local server name")
 set(CLIENT_KEYCHAIN_NAME      "AresVPNClient-Keychain" CACHE STRING "QtKeychain service name used for encrypted settings keys")
 set(CLIENT_ANDROID_PACKAGE    "org.aresvpn.client"     CACHE STRING "Android package name for Play Store version lookup")
-# The AresVPN console the client logs in to (POST /api/profile). Overridable at runtime through
-# Conf/aresEndpoint (the dev menu); this is the compiled default (AresProject #D142, #D173).
+# The AresVPN console the client logs in to (POST /api/profile). This is the compiled default; a
+# `Conf/aresEndpoint` value in the settings store overrides it, and no screen writes one - it is set
+# by hand, for a test console (AresProject #D142, #D173).
 set(CLIENT_ARES_ENDPOINT      "https://console.ares-vpn.org:8080" CACHE STRING "AresVPN console base URL")
 
 # -- translations: DERIVED, never edited in place (AresProject ROADMAP 18-3b mechanism 3, #D180) --

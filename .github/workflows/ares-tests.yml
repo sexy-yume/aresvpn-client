@@ -1,0 +1,32 @@
+# AresVPN Client - the session-rule tests on every push (AresProject audit 2026-11-14 H-17).
+#
+# `client/tests/ares` is a QtCore-only project (its CMakeLists.txt says why): the distribution's
+# Qt 6 is enough, so this needs no conan, no OpenSSL and no Qt download, and runs in minutes.
+name: 'ares tests'
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  session-logic:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: packages (cmake, g++, Qt 6 base)
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends cmake g++ make qt6-base-dev
+      - name: build
+        run: |
+          cmake -S client/tests/ares -B build-ares-tests -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-ares-tests -j4
+      - name: test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build-ares-tests --output-on-failure

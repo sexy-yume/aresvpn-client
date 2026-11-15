@@ -1,9 +1,11 @@
 name: 'Deploy workflow'
 
+# AresVPN: upstream's all-platform build has failed on every push here since 2026-09 (its Windows,
+# macOS and iOS jobs, on upstream's conan and runner setup); the AresVPN builds are `deploy/aresvpn/`
+# and the tests `ares-tests.yml`. By hand only, so a red that says nothing about this fork stops
+# reading as the fork's CI (AresProject D324).
 on:
-  push:
-    branches:
-      - '**'
+  workflow_dispatch:
 
 env:
   QT_MIRROR: https://mirrors.ocf.berkeley.edu/qt/ # https://download.qt.io/static/mirrorlist/

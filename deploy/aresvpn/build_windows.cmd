@@ -14,7 +14,9 @@
 ::                                                      -DARES_HARNESS=ON, so --qml-* and --ares-login run)
 ::         deploy\aresvpn\build_windows.cmd release    (a build meant to be CONVEYED: -DARES_RELEASE=ON
 ::                                                      makes the source-revision and brand checks fatal,
-::                                                      -DARES_HARNESS=OFF compiles the harness out;
+::                                                      -DARES_HARNESS=OFF compiles the harness out, and
+::                                                      the configure refuses unless this working copy is
+::                                                      `dev`, clean (client/CMakeLists.txt, D349);
 ::                                                      package_windows.cmd packages only this kind)
 ::         (an underscore, not a hyphen: upstream's .gitignore:29 `*build-*` would ignore this file)
 :: Both flags are passed EXPLICITLY every time, so a cache left by the other mode never decides.

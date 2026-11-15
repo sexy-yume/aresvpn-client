@@ -21,6 +21,28 @@ if(ARES_RELEASE AND ARES_HARNESS)
                         "carry the test harness; configure the release with -DARES_HARNESS=OFF.")
 endif()
 
+# A CONVEYED BUILD IS MADE FROM `dev`, CLEAN (AresProject D349, audit H4-3). The fork's version is the
+# commit count (cmake/aresvpn/branding.cmake), so a release from a plan branch carries a number a
+# later, different `dev` commit also gets, and one from a modified tree carries a commit it is not.
+# Here rather than in a driver, so it holds for every way a release is configured: the Windows
+# driver builds the working copy, the Android container a fresh clone of `-b dev` (which passes).
+# Untracked files are not counted: the build's own outputs are ignored, and none is compiled in.
+if(ARES_RELEASE)
+    execute_process(COMMAND git symbolic-ref --short HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.."
+        OUTPUT_VARIABLE _ares_branch ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND git status --porcelain --untracked-files=no
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.."
+        RESULT_VARIABLE _ares_status_rc OUTPUT_VARIABLE _ares_dirty ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT _ares_branch STREQUAL "dev" OR NOT _ares_status_rc EQUAL 0 OR NOT _ares_dirty STREQUAL "")
+        message(FATAL_ERROR "AresVPN: -DARES_RELEASE=ON is built from a clean `dev` checkout only (D349). This "
+                            "tree is on \"${_ares_branch}\" (empty: detached or not a git clone), `git status` "
+                            "rc ${_ares_status_rc}, tracked changes:\n${_ares_dirty}\n"
+                            "Merge into dev and check it out clean, or configure without -DARES_RELEASE (a dev "
+                            "build, never conveyed).")
+    endif()
+endif()
+
 set(PACKAGES
     Core Gui Network Xml
     RemoteObjects Quick Svg QuickControls2

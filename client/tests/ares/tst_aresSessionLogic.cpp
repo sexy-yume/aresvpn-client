@@ -86,11 +86,14 @@ private slots:
         QVERIFY(!judgeManifest(QByteArray("not json"), QStringLiteral("windows"), QStringLiteral("5.0.0.0"), &info));
     }
 
-    // The fork's own version (cmake/aresvpn/branding.cmake, audit H3-2): `<base>.<build>`, the build
-    // being the fork's commit count, so every build from `dev` is newer than the one before it, and
-    // a base above upstream's 5.0.2.0, so the builds that still carried upstream's version can be
-    // told to update (the last block). Plant: compare only the first three segments -> every build
-    // of one base reads as equal, and the manifest can neither offer nor require one.
+    // The manifest judged against the fork's own version scheme (cmake/aresvpn/branding.cmake, audit
+    // H3-2): `<base>.<build>`, the build being the fork's commit count, and a base above upstream's
+    // 5.0.2.0, so the builds that still carried upstream's version can be told to update (the last
+    // block). Plant: compare only the first three segments -> every build of one base reads as
+    // equal, and the manifest can neither offer nor require one. This is a regression test of
+    // judgeManifest, NOT of H3-2: that defect was the build's version input, which no unit test
+    // reaches; it is proven by the configure's `AresVPN version` line and the APK's versionName and
+    // versionCode, recorded beside each conveyed tag (audit H4-4).
     void manifestJudgesTheForkVersion()
     {
         const QByteArray body = "{\"android\":{\"latest\":\"6.0.0.3045\",\"min_version\":\"6.0.0.3040\","

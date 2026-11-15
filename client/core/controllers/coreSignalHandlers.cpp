@@ -308,9 +308,9 @@ void CoreSignalHandlers::initAutoConnectHandler()
             // The refresh above refused the stored profile (401, 404, 409): it may be a removed
             // device's or a retired rent's, and opening it unasked would leave the customer in
             // Connecting. Home says why; a Connect they press still uses it (plan 30 T02, H3-3,
-            // H3-V2). The profile the console accepts next is opened (m_aresReopenOwed).
+            // H3-V2). The profile the console accepts next is opened.
             qDebug() << "auto-connect: refused, the console refused the stored profile (" << refreshStatus << ")";
-            m_aresReopenOwed = true;
+            aresLeaveClosed();
             return;
         }
         qDebug() << "auto-connect: firing for" << defaultServerId;
@@ -445,13 +445,16 @@ void CoreSignalHandlers::initAndroidSettingsHandler()
         AndroidController::instance()->resetLastServer(-1);
         AndroidController::instance()->forgetLastConfig();
     });
-    // AresVPN Client (K2-1, H3-V1): the VPN service keeps the last tunnel config it started - for a
-    // WireGuard rent, the device's private key - and starts it again from Always-on, the Quick
+    // AresVPN Client (K2-1, H3-V1, H4-V2): the VPN service keeps the last tunnel config it started -
+    // for a WireGuard rent, the device's private key - and starts it again from Always-on, the Quick
     // Settings tile and the notification's Connect, inside the service and without any of the app's
-    // checks. So the service starts only a config the app would open unasked: it goes on sign-out
+    // checks. So the service keeps only a config the app would open unasked: it goes on sign-out
     // (the one empty `sessionServerSet`, or the next person on the phone gets the rent back), when
-    // the console refuses the stored profile (401, 404, 409: D305), and when this build is below the
-    // console's min_version. A Connect pressed in the app passes the config and saves it again.
+    // the credential is dead (401: signInNeeded), when the session leaves the tunnel closed on a
+    // refusing answer (aresLeaveClosed), and when this build is below the console's min_version.
+    // A 404 or 409 that came back THROUGH a working tunnel does not remove it: that profile is the
+    // one carrying the customer, and no later accepted answer would save it again (H4-V2). A Connect
+    // pressed in the app, or the reopen an accepted answer triggers, passes the config and saves it.
     AresProfileController *ares = m_coreController->m_aresProfileController;
     connect(ares, &AresProfileController::sessionServerSet, this,
             [](const QString &serverId, bool) {
@@ -459,8 +462,8 @@ void CoreSignalHandlers::initAndroidSettingsHandler()
                     AndroidController::instance()->forgetLastConfig();
                 }
             });
-    connect(ares, &AresProfileController::sessionRefreshFailed, this, [](int httpStatus, bool, const QString &) {
-        if (aresSession::refusesStoredProfile(httpStatus)) {
+    connect(ares, &AresProfileController::sessionRefreshFailed, this, [ares](int, bool, const QString &) {
+        if (ares->signInNeeded()) {
             AndroidController::instance()->forgetLastConfig();
         }
     });
@@ -592,22 +595,17 @@ void CoreSignalHandlers::initAresSessionTunnelHandler()
     });
 
     // The tunnel the session left closed, or auto-connect did not open, because the console refused
-    // the stored profile (aresAfterTunnelClosed, initAutoConnectHandler) comes back on the first
-    // profile the console accepts again: a retire-first swap's new rent, a freed device, a sign-in
-    // (H3-3, H3-V2). Queued, because a refresh adopts its server after it says it was accepted.
+    // the stored profile (aresLeaveClosed) comes back on the first profile the console accepts again:
+    // a retire-first swap's new rent, a freed device, a sign-in (H3-3, H3-V2). The controller says
+    // so only once the answer is stored and its server adopted (H4-6), so the reopen runs at once.
     connect(ares, &AresProfileController::sessionRefreshed, this, [this]() {
-        if (!m_aresReopenOwed) {
+        if (!m_aresReopenOwed || aresTunnelUp() || m_coreController->m_aresProfileController->sessionServerId().isEmpty()) {
             return;
         }
-        QTimer::singleShot(0, this, [this]() {
-            if (!m_aresReopenOwed || aresTunnelUp() || m_coreController->m_aresProfileController->sessionServerId().isEmpty()) {
-                return;
-            }
-            m_aresReopenOwed = false;
-            aresAdoptSessionServer();
-            qDebug() << "ares session: the console accepts the session's profile again - opening the tunnel";
-            m_coreController->m_connectionUiController->openConnection();
-        });
+        m_aresReopenOwed = false;
+        aresAdoptSessionServer();
+        qDebug() << "ares session: the console accepts the session's profile again - opening the tunnel";
+        m_coreController->m_connectionUiController->openConnection();
     });
 
     connect(m_coreController->m_connectionController, &ConnectionController::connectionStateChanged, this,
@@ -661,10 +659,10 @@ void CoreSignalHandlers::aresAfterTunnelClosed(AresPending pending)
         } else if (!aresTunnelUp()) {
             // The console refused the stored profile (401, 404, 409). Whatever it accepts next - a
             // sign-in after a 401, the direct poll's answer once the idx names a new rent or a device
-            // is freed - reopens the tunnel the session closed (m_aresReopenOwed).
+            // is freed - reopens the tunnel the session closed.
             qDebug() << "ares session: the console refused the stored profile (" << refreshStatus
                      << ") - the tunnel stays closed until it accepts one";
-            m_aresReopenOwed = true;
+            aresLeaveClosed();
         }
         return;
     case aresSession::AfterClose::Reopen:
@@ -696,6 +694,14 @@ bool CoreSignalHandlers::aresAdoptSessionServer()
     }
     servers->setDefaultServer(serverId);
     return true;
+}
+
+void CoreSignalHandlers::aresLeaveClosed()
+{
+    m_aresReopenOwed = true;
+#ifdef Q_OS_ANDROID
+    AndroidController::instance()->forgetLastConfig();
+#endif
 }
 
 // A tunnel being closed is not up: re-pointing it then would reopen what the customer is closing.

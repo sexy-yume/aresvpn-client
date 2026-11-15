@@ -537,11 +537,11 @@ AresProfileController::Result AresProfileController::loginSession(const QString 
     // already existed at launch, and a logout stops it), so start it here.
     startSessionPolling();
     emit sessionChanged();
-    emit sessionRefreshed();
     const bool identityChanged = r.serverId != previousServerId
             || r.deviceId != previous.value(QStringLiteral("deviceId")).toString()
             || r.identity != previous.value(QStringLiteral("identity")).toString();
     emit sessionServerSet(r.serverId, identityChanged);
+    emit sessionRefreshed();  // last, as in refreshSession: the session is stored and adopted
     return r;
 }
 
@@ -617,8 +617,8 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
         m_signInNeeded = false;
         startSessionPolling();
     }
-    emit sessionRefreshed();
     if (r.notModified) {
+        emit sessionRefreshed();
         return r;
     }
 
@@ -634,7 +634,8 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
     const QVariantMap next = aresSession::withAnswer(session, r.serverId, r.deviceId, r.identity, r.etag, r.refreshToken);
     if (next != session && !m_appSettingsRepository->setAresSession(next)) {
         // The keychain refused. Announcing a change that is not stored would reconnect on every
-        // poll, so say nothing and keep the session as it was.
+        // poll, so say nothing and keep the session as it was. Nor is it announced as accepted:
+        // that would reopen a tunnel the session left closed on the stored, refused profile (H4-6).
         r.errorCode = amnezia::ErrorCode::InternalError;
         r.message = tr("This device could not store your sign-in securely: the system keychain refused. Nothing was changed.");
         return r;
@@ -649,6 +650,9 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
         emit sessionChanged();
         emit sessionServerSet(r.serverId, true);
     }
+    // Only now, with the answer stored and its server adopted, is the session current - the
+    // header's contract, and what a reopen owed after a refusal opens (H4-6).
+    emit sessionRefreshed();
     return r;
 }
 

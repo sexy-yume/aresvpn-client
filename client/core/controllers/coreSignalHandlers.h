@@ -53,6 +53,9 @@ private:
     void aresAfterTunnelClosed(AresPending pending);  // the routine's second half, once Disconnected
     bool aresAdoptSessionServer();  // the default server becomes the session's; true when it moved
     bool aresTunnelUp() const;      // Connected, Connecting or Reconnecting - not Disconnecting
+    // The console refused the stored profile and the session leaves the tunnel closed: the profile
+    // it accepts next reopens it (m_aresReopenOwed), and on Android the saved config goes until then.
+    void aresLeaveClosed();
 
     CoreController* m_coreController;
     AresPending m_aresPending = AresPending::None;  // what to do once the tunnel reports Disconnected

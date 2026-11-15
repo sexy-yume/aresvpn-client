@@ -68,7 +68,7 @@ preload:
 
 | change | where | why it lives there |
 |---|---|---|
-| product identity (names, organisation, keychain, Android package for the store URL) | `cmake/aresvpn/branding.cmake` | upstream's own `CLIENT_*` branding seam - zero upstream lines |
+| product identity (names, organisation, keychain, Android package for the store URL) and the version (`6.0.0.<commit count>`, Android versionCode upstream's + the same count) | `cmake/aresvpn/branding.cmake` | upstream's own `CLIENT_*` branding seam and `APP_ANDROID_VERSION_CODE_OFFSET` - zero upstream lines |
 | artwork | `branding/aresvpn/` masters + `generate.py`; rasters written in place under upstream's filenames | no `.qrc`/`.rc`/manifest line changes |
 | OS namespaces (services, tunnel, pipe, IPC, credential-store tags, WFP keys, installer scripts) | small in-place edits, each marked `AresVPN Client:` | upstream's lowest-churn code |
 | the self-hosted installer and the Premium store | routes cut in `client/ui/`, the update check guarded, the write-access predicate forced false, `server_scripts` not embedded | every controller stays constructed; a merge survives |

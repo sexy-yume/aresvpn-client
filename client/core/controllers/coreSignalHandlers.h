@@ -58,6 +58,8 @@ private:
     AresPending m_aresPending = AresPending::None;  // what to do once the tunnel reports Disconnected
     Vpn::ConnectionState m_aresTunnelState = Vpn::ConnectionState::Disconnected;
     QElapsedTimer m_aresLastStallCycle;             // the last close -> refresh -> reopen for a stall
+    bool m_aresReopenOwed = false;                  // the tunnel stays closed only until the console
+                                                    // accepts the session's profile again (H3-V2)
 };
 
 #endif // CORESIGNALHANDLERS_H

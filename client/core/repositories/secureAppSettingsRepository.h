@@ -66,7 +66,8 @@ public:
     QByteArray readGatewayProxyUrls(const QString &cacheKey) const;
 
     // AresVPN Client: the console's base URL (Conf/aresEndpoint), empty = the compiled default.
-    // Read-only by design: no screen sets it; a test console is configured by hand.
+    // Read-only by design: no screen sets it, a settings backup neither carries nor restores it
+    // (K3-3), and a test console is configured by hand.
     QString getAresEndpoint() const;
 
     // AresVPN Client: a rent EXPIRES, which is the one thing about our product that upstream's

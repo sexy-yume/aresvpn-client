@@ -37,8 +37,10 @@ void ConnectionUiController::openConnection()
     }
 
     // AresVPN Client: below the console's min_version this build refuses to connect (D268). Here,
-    // because every way of opening a tunnel ends here - Home's Connect, auto-connect, the tray's
-    // Connect, the session's own reopen - and a check in each caller missed the tray (H2-5).
+    // because every in-app way of opening a tunnel ends here - Home's Connect, auto-connect, the
+    // tray's Connect, the session's own reopen - and a check in each caller missed the tray (H2-5).
+    // Android's VPN service starts only a config the app saved, and the app removes it once this
+    // build is refused (CoreSignalHandlers::initAndroidSettingsHandler, H3-V1).
     if (m_aresProfileController && m_aresProfileController->updateInfo().required) {
         qWarning() << "connect refused: this version is below the console's minimum";
         notifyConnectionBlocked(ErrorCode::AresUpdateRequired);

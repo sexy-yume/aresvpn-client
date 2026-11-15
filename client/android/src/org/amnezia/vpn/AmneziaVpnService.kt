@@ -73,11 +73,13 @@ private const val PREFS_CONFIG_KEY = "LAST_CONF"
 private const val PREFS_SERVER_NAME = "LAST_SERVER_NAME"
 private const val PREFS_SERVER_INDEX = "LAST_SERVER_INDEX"
 
-// AresVPN Client (K2-1): the saved config is what a config-less connect() starts - Always-on, the
-// tile, the notification's Connect - and for a WireGuard rent it holds the device's private key.
-// A sign-out removes it in the app's process (for a service process that is not running) and in
-// the bound service's own process, whose SharedPreferences copy would otherwise still hold it and
-// write it back on the next save.
+// AresVPN Client (K2-1, H3-V1): the saved config is what a config-less connect() starts - Always-on,
+// the tile, the notification's Connect - without any of the app's checks, and for a WireGuard rent
+// it holds the device's private key. So the app removes it whenever it would not open it unasked
+// (sign-out, a settings reset, the console refusing the stored profile, a build below the console's
+// min_version): in the app's process (for a service process that is not running) and in the bound
+// service's own process, whose SharedPreferences copy would otherwise still hold it and write it
+// back on the next save.
 fun forgetLastVpnConfig() = Prefs.remove(PREFS_CONFIG_KEY, PREFS_SERVER_NAME, PREFS_SERVER_INDEX)
 
 // private const val STATISTICS_SENDING_TIMEOUT = 1000L

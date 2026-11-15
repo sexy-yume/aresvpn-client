@@ -730,7 +730,9 @@ class AmneziaActivity : QtActivity() {
         }
     }
 
-    // AresVPN Client (K2-1): called on sign-out. See forgetLastVpnConfig.
+    // AresVPN Client (K2-1, H3-V1): called on sign-out, on a settings reset, when the console refuses
+    // the stored profile and when this build is below the console's min_version
+    // (CoreSignalHandlers::initAndroidSettingsHandler). See forgetLastVpnConfig.
     @Suppress("unused")
     fun forgetLastConfig() {
         Log.v(TAG, "Forget the last VPN config")

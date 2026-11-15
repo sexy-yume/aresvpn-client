@@ -56,13 +56,23 @@ namespace aresSession
     bool serverNeedsWrite(bool stored, const QString &sessionServerId, const QString &sessionIdentity,
                           const QString &serverId, const QString &identity);
 
+    // Whether a console answer to a sign-in or refresh refuses the profile stored on this device:
+    // 401 (the credential is dead: a removed device, a changed password), 404 (no rent carries the
+    // idx - the window of a retire-first swap, before the operator hangs the idx on the new rent,
+    // audit H3-V2), 409 (the rent the idx names now refuses this device: its device limit, H3-3).
+    // Nothing opens such a profile unasked; a Connect the customer presses still does.
+    bool refusesStoredProfile(int httpStatus);
+
     // What the session's re-point routine does once the tunnel it closed reports Disconnected
     // (plan 28). `refreshBusy`: the refresh it owed found another one on the wire and asked nothing
-    // (H2-V1) - ask again shortly rather than reopen unrefreshed. `signInNeeded`: the console refused
-    // the stored credential, so the stored profile is most likely what stalled the tunnel and is
-    // not reopened unasked (plan 30 T02). `tunnelUp`: the customer reopened it meanwhile.
+    // (H2-V1) - ask again shortly rather than reopen unrefreshed. `signInNeeded`: an earlier refresh
+    // was answered 401. `refreshStatus`: the status of the refresh made while the tunnel was down (0
+    // when none was made or none answered); one that refuses the stored profile means that profile
+    // is most likely what stalled the tunnel, so it is not reopened unasked (plan 30 T02, H3-3,
+    // H3-V2). `tunnelUp`: the customer reopened it meanwhile.
     enum class AfterClose { AskAgain, Leave, Reopen };
-    AfterClose afterTunnelClosed(bool refreshBusy, bool hasSessionServer, bool signInNeeded, bool tunnelUp);
+    AfterClose afterTunnelClosed(bool refreshBusy, bool hasSessionServer, bool signInNeeded, int refreshStatus,
+                                 bool tunnelUp);
 }
 
 #endif // ARESSESSIONLOGIC_H

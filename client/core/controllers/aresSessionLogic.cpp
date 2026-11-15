@@ -96,12 +96,18 @@ namespace aresSession
         return !stored || sessionServerId != serverId || sessionIdentity.isEmpty() || sessionIdentity != identity;
     }
 
-    AfterClose afterTunnelClosed(bool refreshBusy, bool hasSessionServer, bool signInNeeded, bool tunnelUp)
+    bool refusesStoredProfile(int httpStatus)
+    {
+        return httpStatus == 401 || httpStatus == 404 || httpStatus == 409;
+    }
+
+    AfterClose afterTunnelClosed(bool refreshBusy, bool hasSessionServer, bool signInNeeded, int refreshStatus,
+                                 bool tunnelUp)
     {
         if (refreshBusy) {
             return AfterClose::AskAgain;
         }
-        if (!hasSessionServer || signInNeeded || tunnelUp) {
+        if (!hasSessionServer || signInNeeded || refusesStoredProfile(refreshStatus) || tunnelUp) {
             return AfterClose::Leave;
         }
         return AfterClose::Reopen;

@@ -25,7 +25,8 @@ namespace {
 
 // AresVPN Client (AresProject plan 28): `Conf/aresSession` holds the account's refresh credential
 // (the password, or a device token from a console that issues them), so it is encrypted like the
-// server list. It is also kept out of settings backups (backupAppConfig, restoreAppConfig).
+// server list. It is also kept out of settings backups (backupAppConfig, restoreAppConfig), and so
+// is `Conf/aresEndpoint`, the console that credential is sent to (audit K2-5, K3-3).
 SecureQSettings::SecureQSettings(const QString &organization, const QString &application, QObject *parent, bool enableEncryption)
     : QObject { parent }, m_settings(organization, application, parent),
       encryptedKeys({ "Servers/serversList", "Conf/aresSession" }), m_encryptionEnabled(enableEncryption)
@@ -142,8 +143,9 @@ QByteArray SecureQSettings::backupAppConfig() const
       {
         // AresVPN Client: the session carries the account's credential; a backup file is not
         // a place for it, and restoring one onto another device would be a second device on
-        // this one's sign-in.
-        if (key == "Conf/installationUuid" || key == "Conf/aresSession")
+        // this one's sign-in. The console endpoint is where that credential goes: a crafted
+        // backup naming another host would receive the next sign-in's password (K3-3).
+        if (key == "Conf/installationUuid" || key == "Conf/aresSession" || key == "Conf/aresEndpoint")
         {
           return false;
         }
@@ -179,7 +181,7 @@ bool SecureQSettings::restoreAppConfig(const QByteArray &json)
         return false;
 
     for (const QString &key : cfg.keys()) {
-        if (key == "Conf/installationUuid" || key == "Conf/aresSession") {
+        if (key == "Conf/installationUuid" || key == "Conf/aresSession" || key == "Conf/aresEndpoint") {
             continue;
         }
         setValue(key, cfg.value(key).toVariant());

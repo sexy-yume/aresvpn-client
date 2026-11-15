@@ -703,8 +703,9 @@ void AresProfileController::stopSessionPolling()
 // ---- THE UPDATE MANIFEST (plan 28) ------------------------------------------------------------
 //
 // The console serves one JSON object with a block per platform:
-//   { "windows": { "latest": "5.0.3.0", "min_version": "5.0.0.0",
+//   { "windows": { "latest": "6.0.0.3045", "min_version": "6.0.0.3040",
 //                  "url": "https://...", "sha256": "<hex>" }, "android": { ... } }
+// compared against APP_VERSION, the fork's own `<base>.<commit count>` (cmake/aresvpn/branding.cmake).
 // `latest` newer than this build shows an offer; this build older than `min_version` refuses to
 // connect and says so. `sha256` is for the download page and a future in-app installer; nothing
 // here downloads. Anything that does not parse is ignored, and a 404 - the console serves no

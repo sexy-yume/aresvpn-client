@@ -86,6 +86,34 @@ private slots:
         QVERIFY(!judgeManifest(QByteArray("not json"), QStringLiteral("windows"), QStringLiteral("5.0.0.0"), &info));
     }
 
+    // The fork's own version (cmake/aresvpn/branding.cmake, audit H3-2): `<base>.<build>`, the build
+    // being the fork's commit count, so every build from `dev` is newer than the one before it, and
+    // a base above upstream's 5.0.2.0, so the builds that still carried upstream's version can be
+    // told to update (the last block). Plant: compare only the first three segments -> every build
+    // of one base reads as equal, and the manifest can neither offer nor require one.
+    void manifestJudgesTheForkVersion()
+    {
+        const QByteArray body = "{\"android\":{\"latest\":\"6.0.0.3045\",\"min_version\":\"6.0.0.3040\","
+                                "\"url\":\"https://example.org/AresVPNClient.apk\"}}";
+        UpdateInfo info;
+        QVERIFY(judgeManifest(body, QStringLiteral("android"), QStringLiteral("6.0.0.3038"), &info));
+        QVERIFY(info.available);
+        QVERIFY(info.required);
+
+        QVERIFY(judgeManifest(body, QStringLiteral("android"), QStringLiteral("6.0.0.3040"), &info));
+        QVERIFY(info.available);
+        QVERIFY(!info.required);
+
+        QVERIFY(judgeManifest(body, QStringLiteral("android"), QStringLiteral("6.0.0.3045"), &info));
+        QVERIFY(!info.available);
+        QVERIFY(!info.required);
+
+        // A build that still says upstream's 5.0.2.0 (every APK before H3-2) is offered and refused.
+        QVERIFY(judgeManifest(body, QStringLiteral("android"), QStringLiteral("5.0.2.0"), &info));
+        QVERIFY(info.available);
+        QVERIFY(info.required);
+    }
+
     // Plant: fall back from "localhost" straight to the OS name -> every phone on one Android release
     // is called "Android 14" on the console's device page (H-11).
     void deviceNameFallsBackToTheModel()
@@ -129,14 +157,29 @@ private slots:
     // left through the closing tunnel is still on the wire, then ignores the dead tunnel for an
     // hour, H2-V1); drop the sign-in test (a 401 from the direct refresh - a removed device, a rent
     // swapped on a console that asks for a sign-in - reopens the tunnel on the retired profile and
-    // leaves the customer in Connecting, plan 30 T02).
+    // leaves the customer in Connecting, plan 30 T02); drop 404 or 409 from refusesStoredProfile (a
+    // retire-first swap's window, or a swap onto a rent at its device limit, reopens the retired
+    // profile and the polls then vanish into it for an hour, H3-V2, H3-3); count a 429, a 503 or no
+    // answer as a refusal (a busy console would leave a working tunnel closed).
     void reopenAfterTheTunnelClosed()
     {
-        QVERIFY(afterTunnelClosed(false, true, false, false) == AfterClose::Reopen);
-        QVERIFY(afterTunnelClosed(true, true, false, false) == AfterClose::AskAgain);
-        QVERIFY(afterTunnelClosed(false, true, true, false) == AfterClose::Leave);
-        QVERIFY(afterTunnelClosed(false, false, false, false) == AfterClose::Leave);  // signed out
-        QVERIFY(afterTunnelClosed(false, true, false, true) == AfterClose::Leave);    // reopened by hand
+        QVERIFY(afterTunnelClosed(false, true, false, 200, false) == AfterClose::Reopen);
+        QVERIFY(afterTunnelClosed(false, true, false, 304, false) == AfterClose::Reopen);
+        QVERIFY(afterTunnelClosed(false, true, false, 0, false) == AfterClose::Reopen);     // no answer
+        QVERIFY(afterTunnelClosed(false, true, false, 429, false) == AfterClose::Reopen);
+        QVERIFY(afterTunnelClosed(false, true, false, 503, false) == AfterClose::Reopen);
+        QVERIFY(afterTunnelClosed(true, true, false, 0, false) == AfterClose::AskAgain);
+        QVERIFY(afterTunnelClosed(false, true, true, 0, false) == AfterClose::Leave);      // an earlier 401
+        QVERIFY(afterTunnelClosed(false, true, false, 401, false) == AfterClose::Leave);
+        QVERIFY(afterTunnelClosed(false, true, false, 404, false) == AfterClose::Leave);
+        QVERIFY(afterTunnelClosed(false, true, false, 409, false) == AfterClose::Leave);
+        QVERIFY(afterTunnelClosed(false, false, false, 200, false) == AfterClose::Leave);  // signed out
+        QVERIFY(afterTunnelClosed(false, true, false, 200, true) == AfterClose::Leave);    // reopened by hand
+
+        // Auto-connect applies the same predicate to the refresh it makes first.
+        QVERIFY(refusesStoredProfile(401) && refusesStoredProfile(404) && refusesStoredProfile(409));
+        QVERIFY(!refusesStoredProfile(0) && !refusesStoredProfile(200) && !refusesStoredProfile(304));
+        QVERIFY(!refusesStoredProfile(400) && !refusesStoredProfile(429) && !refusesStoredProfile(503));
     }
 };
 

@@ -24,6 +24,42 @@ set(CLIENT_ANDROID_PACKAGE    "org.aresvpn.client"     CACHE STRING "Android pac
 # by hand, for a test console (AresProject #D142, #D173).
 set(CLIENT_ARES_ENDPOINT      "https://console.ares-vpn.org:8080" CACHE STRING "AresVPN console base URL")
 
+# -- version: the fork's OWN, carried by every build that loads this preload (audit H3-2) --------
+#
+# `<base>.<build>`. The base is set here by hand and moves only when the product says so. The build
+# is the fork's commit count, `git rev-list --count HEAD`: every commit on `dev` builds a newer
+# version than the one before it, a rebuild of one commit carries the same one, and the Windows and
+# Android builds of one commit carry the same one - the value the console's update manifest is
+# judged against (`aresSession::judgeManifest`, AresProject #D268). The base starts above upstream's
+# 5.0.2.0, which every build before this one carried, so a manifest can require those to update.
+#
+# Android's versionCode is upstream's base code plus the same count (APP_ANDROID_VERSION_CODE_OFFSET,
+# the root CMakeLists' own seam), so it rises with every commit and stays above every APK that
+# carried upstream's 2159: Android refuses to install a lower versionCode over a higher one.
+#
+# FORCE, because a build directory keeps its cache and a reconfigure after a new commit would
+# otherwise carry the old count; both drivers configure on every run. The count needs the full
+# history, which both drivers build from (the working copy; the container's full local clone).
+set(ARES_CLIENT_VERSION_BASE "6.0.0")
+execute_process(
+    COMMAND git rev-list --count HEAD
+    WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../.."
+    RESULT_VARIABLE _ares_git_rc
+    OUTPUT_VARIABLE _ares_build
+    ERROR_VARIABLE _ares_git_err
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT _ares_git_rc EQUAL 0)
+    message(FATAL_ERROR
+        "AresVPN branding: the build number is the fork's commit count, and\n"
+        "`git rev-list --count HEAD` failed (${_ares_git_rc}): ${_ares_git_err}\n"
+        "Build from a git clone of the fork, with git on PATH.")
+endif()
+set(AMNEZIAVPN_VERSION "${ARES_CLIENT_VERSION_BASE}.${_ares_build}"
+    CACHE STRING "Client app version: the AresVPN base and the fork's commit count" FORCE)
+set(APP_ANDROID_VERSION_CODE_OFFSET "${_ares_build}"
+    CACHE STRING "Added to upstream's Android versionCode: the fork's commit count" FORCE)
+message(STATUS "AresVPN version ${AMNEZIAVPN_VERSION} (Android versionCode: upstream's base + ${_ares_build})")
+
 # -- translations: DERIVED, never edited in place (AresProject ROADMAP 18-3b mechanism 3, #D180) --
 #
 # 599 translated strings across ten languages carried Amnezia's marks, and the GPL licenses their

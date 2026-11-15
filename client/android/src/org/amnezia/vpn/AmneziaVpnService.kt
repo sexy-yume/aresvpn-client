@@ -72,6 +72,14 @@ const val AFTER_PERMISSION_CHECK = "AFTER_PERMISSION_CHECK"
 private const val PREFS_CONFIG_KEY = "LAST_CONF"
 private const val PREFS_SERVER_NAME = "LAST_SERVER_NAME"
 private const val PREFS_SERVER_INDEX = "LAST_SERVER_INDEX"
+
+// AresVPN Client (K2-1): the saved config is what a config-less connect() starts - Always-on, the
+// tile, the notification's Connect - and for a WireGuard rent it holds the device's private key.
+// A sign-out removes it in the app's process (for a service process that is not running) and in
+// the bound service's own process, whose SharedPreferences copy would otherwise still hold it and
+// write it back on the next save.
+fun forgetLastVpnConfig() = Prefs.remove(PREFS_CONFIG_KEY, PREFS_SERVER_NAME, PREFS_SERVER_INDEX)
+
 // private const val STATISTICS_SENDING_TIMEOUT = 1000L
 private const val TRAFFIC_STATS_UPDATE_TIMEOUT = 1000L
 private const val DISCONNECT_TIMEOUT = 5000L
@@ -179,6 +187,10 @@ open class AmneziaVpnService : VpnService() {
 
                     Action.SET_SAVE_LOGS -> {
                         Log.saveLogs = msg.data.getBoolean(MSG_SAVE_LOGS)
+                    }
+
+                    Action.FORGET_LAST_CONFIG -> {
+                        forgetLastVpnConfig()
                     }
                 }
             }

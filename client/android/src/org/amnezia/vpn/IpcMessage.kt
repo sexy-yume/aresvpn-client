@@ -33,7 +33,8 @@ enum class Action : IpcMessage {
     DISCONNECT,
     REQUEST_STATUS,
     NOTIFICATION_PERMISSION_GRANTED,
-    SET_SAVE_LOGS
+    SET_SAVE_LOGS,
+    FORGET_LAST_CONFIG
 }
 
 fun <T> T.packToMessage(): Message

@@ -730,6 +730,16 @@ class AmneziaActivity : QtActivity() {
         }
     }
 
+    // AresVPN Client (K2-1): called on sign-out. See forgetLastVpnConfig.
+    @Suppress("unused")
+    fun forgetLastConfig() {
+        Log.v(TAG, "Forget the last VPN config")
+        mainScope.launch {
+            forgetLastVpnConfig()
+            if (isServiceConnected) vpnServiceMessenger.send(Action.FORGET_LAST_CONFIG)
+        }
+    }
+
     @Suppress("unused")
     fun saveFile(fileName: String, data: String) {
         Log.d(TAG, "Save file $fileName")

@@ -154,6 +154,11 @@ void AndroidController::resetLastServer(int serverIndex)
     callActivityMethod("resetLastServer", "(I)V", serverIndex);
 }
 
+void AndroidController::forgetLastConfig()
+{
+    callActivityMethod("forgetLastConfig", "()V");
+}
+
 void AndroidController::saveFile(const QString &fileName, const QString &data)
 {
     callActivityMethod("saveFile", "(Ljava/lang/String;Ljava/lang/String;)V",

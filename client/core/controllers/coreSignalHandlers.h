@@ -46,9 +46,11 @@ private:
 
     // AresVPN Client (plan 28): THE ONE ROUTINE by which the session re-points the tunnel - close it
     // if it is up, set the default server to the session's, reopen it if the session still has a
-    // server. `refreshWhileDown` also refreshes the session in between, while no tunnel carries it.
+    // server the console has not refused (aresSession::afterTunnelClosed). `refreshWhileDown` also
+    // refreshes the session in between, while no tunnel carries it.
     enum class AresPending { None, Reopen, RefreshThenReopen };
     void aresRepointTunnel(bool refreshWhileDown);
+    void aresAfterTunnelClosed(AresPending pending);  // the routine's second half, once Disconnected
     bool aresAdoptSessionServer();  // the default server becomes the session's; true when it moved
     bool aresTunnelUp() const;      // Connected, Connecting or Reconnecting - not Disconnecting
 

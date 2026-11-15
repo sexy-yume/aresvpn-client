@@ -400,6 +400,12 @@ The same texts are installed beside the program&apos;s executable, and the compl
         <source>The AresVPN background service is not running, so no tunnel can be opened. It is installed with the app and starts with Windows; if you are running a build directly, install it first or start the AresVPNClient-service process.</source>
         <translation>AresVPN 백그라운드 서비스가 실행 중이 아니어서 터널을 열 수 없습니다. 이 서비스는 앱과 함께 설치되어 Windows 시작 시 실행됩니다. 빌드를 직접 실행 중이라면 먼저 설치하거나 AresVPNClient-service 프로세스를 시작하세요.</translation>
     </message>
+    <!-- H2-5: the refusal below the update manifest's min_version, on every path that opens a
+         tunnel (Home, the tray, auto-connect, the session's reopen). -->
+    <message>
+        <source>This version of the app is no longer supported. Install the update shown on the home screen to connect again.</source>
+        <translation>이 버전의 앱은 더 이상 지원되지 않습니다. 다시 연결하려면 홈 화면에 표시된 업데이트를 설치하세요.</translation>
+    </message>
 </context>
 <context>
     <name>AresProfileUiController</name>

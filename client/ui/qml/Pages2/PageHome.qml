@@ -312,9 +312,10 @@ PageType {
                 Layout.preferredHeight: 52
 
                 // A live or starting tunnel can always be closed - a connection stuck in Connecting is
-                // cancelled here, as upstream's ConnectButton allows (H-9); opening one needs a rent
-                // and is refused below min_version.
-                enabled: root.busy || root.connected || (root.hasRent && !root.updateRequired)
+                // cancelled here, as upstream's ConnectButton allows (H-9); opening one needs a rent.
+                // Below min_version the open itself is refused, with a message, in
+                // ConnectionUiController::openConnection, which every path reaches (H2-5).
+                enabled: root.busy || root.connected || root.hasRent
                 text: root.busy ? qsTr("Cancel")
                                 : (root.connected ? qsTr("Disconnect") : qsTr("Connect"))
 

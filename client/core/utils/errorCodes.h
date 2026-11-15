@@ -132,6 +132,7 @@ namespace amnezia
         AresNoSuchRent = 1401,
         AresEndpointUnreachable = 1402,
         AresRentNotImportable = 1403,
+        AresUpdateRequired = 1404,  // below the update manifest's min_version: Connect is refused (D268)
       };
       Q_ENUM_NS(ErrorCode)
     }

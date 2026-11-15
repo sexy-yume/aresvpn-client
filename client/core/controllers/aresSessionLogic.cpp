@@ -95,4 +95,15 @@ namespace aresSession
     {
         return !stored || sessionServerId != serverId || sessionIdentity.isEmpty() || sessionIdentity != identity;
     }
+
+    AfterClose afterTunnelClosed(bool refreshBusy, bool hasSessionServer, bool signInNeeded, bool tunnelUp)
+    {
+        if (refreshBusy) {
+            return AfterClose::AskAgain;
+        }
+        if (!hasSessionServer || signInNeeded || tunnelUp) {
+            return AfterClose::Leave;
+        }
+        return AfterClose::Reopen;
+    }
 }

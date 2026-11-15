@@ -49,8 +49,8 @@ Two modes, and both flags are passed explicitly every time:
 - `build_windows.cmd` - a **dev** build: `-DARES_HARNESS=ON` compiles the measurement harness in
   (`--qml-smoke`, `--qml-shot`, `--qml-drive`, `--font-report`, `--ares-login`; `client/aresHarness.cpp`).
 - `build_windows.cmd release` - a build meant to be **conveyed**: `-DARES_RELEASE=ON` makes the
-  source-revision, brand and disabled-function checks fatal, and `-DARES_HARNESS=OFF` keeps the test
-  driver and Qt's private API out of the customer's binary. CMake refuses the two together.
+  source-revision and brand checks fatal, and `-DARES_HARNESS=OFF` keeps the test driver and Qt's
+  private API out of the customer's binary. CMake refuses the two together.
 
 `deploy\aresvpn\package_windows.cmd` packages only a release-configured tree, and refuses an
 unsigned installer unless `ARES_ALLOW_UNSIGNED=1` is set (for measurement; never conveyed).

@@ -32,6 +32,7 @@ public:
     ErrorCode start(const QJsonObject &vpnConfig);
     void stop();
     void resetLastServer(int serverIndex);
+    void forgetLastConfig();  // AresVPN Client (K2-1): the VPN service's saved tunnel config goes
     void saveFile(const QString &fileName, const QString &data);
     QString openFile(const QString &filter);
     int getFd(const QString &fileName);

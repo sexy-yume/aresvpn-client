@@ -124,6 +124,20 @@ private slots:
         QVERIFY(serverNeedsWrite(true, QStringLiteral("ares-rent-6"), QStringLiteral("d1"), id, QStringLiteral("d1")));
         QVERIFY(serverNeedsWrite(true, id, QString(), id, QStringLiteral("d1")));
     }
+
+    // Plants: drop the busy test (the stall cycle reopens on the stale profile while a poll that
+    // left through the closing tunnel is still on the wire, then ignores the dead tunnel for an
+    // hour, H2-V1); drop the sign-in test (a 401 from the direct refresh - a removed device, a rent
+    // swapped on a console that asks for a sign-in - reopens the tunnel on the retired profile and
+    // leaves the customer in Connecting, plan 30 T02).
+    void reopenAfterTheTunnelClosed()
+    {
+        QVERIFY(afterTunnelClosed(false, true, false, false) == AfterClose::Reopen);
+        QVERIFY(afterTunnelClosed(true, true, false, false) == AfterClose::AskAgain);
+        QVERIFY(afterTunnelClosed(false, true, true, false) == AfterClose::Leave);
+        QVERIFY(afterTunnelClosed(false, false, false, false) == AfterClose::Leave);  // signed out
+        QVERIFY(afterTunnelClosed(false, true, false, true) == AfterClose::Leave);    // reopened by hand
+    }
 };
 
 QTEST_GUILESS_MAIN(TestAresSessionLogic)

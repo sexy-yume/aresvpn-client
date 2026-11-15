@@ -557,8 +557,12 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
         return r;
     }
     // One at a time. The poll timer and a manual refresh can both arrive, and the request spins a
-    // nested event loop - re-entering it would interleave two imports over one session.
+    // nested event loop - re-entering it would interleave two imports over one session. The answer
+    // is not a success: nothing was asked, so "Check now" must not read "up to date" from it (H2-3),
+    // and the stall cycle must not reopen on the stored profile as if it had been refreshed (H2-V1).
     if (m_refreshing) {
+        r.errorCode = amnezia::ErrorCode::AresEndpointUnreachable;
+        r.busy = true;
         r.message = tr("A refresh is already running.");
         return r;
     }
@@ -598,8 +602,9 @@ AresProfileController::Result AresProfileController::refreshSession(bool *change
         // A 401 is different (plan 28): the stored credential is dead - the password was changed,
         // or the device and its token were deleted - and asking again every five minutes only fills
         // the console's log with refusals that look like credential stuffing. The poll stops, the
-        // stored profile stays (it still works when only the password changed), and the customer is
-        // asked to sign in again.
+        // stored profile stays for a Connect the customer presses (it still works when only the
+        // password changed) but is not reopened unasked (signInNeeded), and the customer is asked
+        // to sign in again.
         if (r.httpStatus == 401) {
             m_signInNeeded = true;
             stopSessionPolling();

@@ -5,9 +5,13 @@
 #include "windowstunnelservice.h"
 
 #include <Windows.h>
+#include <sddl.h>
 
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
 #include <QScopeGuard>
+#include <QStandardPaths>
 
 #include "leakdetector.h"
 #include "logger.h"
@@ -27,6 +31,41 @@ Logger logger("WindowsTunnelService");
 
 static bool stopAndDeleteTunnelService(SC_HANDLE service);
 static bool waitForServiceStatus(SC_HANDLE service, DWORD expectedStatus);
+
+// AresVPN Client (K2-V1): the tunnel's configuration carries its [Interface] PrivateKey and its
+// [Peer] PresharedKey. The service's command line is its ImagePath, which any local user reads
+// (`sc qc`), so only the path of a file goes there: a file in SYSTEM's own profile whose DACL
+// admits SYSTEM alone, written by start() and removed by it once the service has read it.
+static QString tunnelConfigPath() {
+  return QDir(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation))
+      .filePath("AresVPN-tunnel.conf");
+}
+
+static bool writeSystemOnlyFile(const QString& path, const QByteArray& data) {
+  PSECURITY_DESCRIPTOR sd = nullptr;
+  // A protected DACL with one entry, SYSTEM: nothing is inherited from the directory.
+  if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+          L"D:P(A;;FA;;;SY)", SDDL_REVISION_1, &sd, nullptr)) {
+    return false;
+  }
+  auto sdGuard = qScopeGuard([&] { LocalFree(sd); });
+  SECURITY_ATTRIBUTES sa = {sizeof(sa), sd, FALSE};
+
+  // CREATE_NEW after the delete: an existing file would keep its own DACL.
+  const std::wstring native = QDir::toNativeSeparators(path).toStdWString();
+  DeleteFileW(native.c_str());
+  HANDLE file = CreateFileW(native.c_str(), GENERIC_WRITE, 0, &sa, CREATE_NEW,
+                            FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+  DWORD written = 0;
+  const bool ok = WriteFile(file, data.constData(), DWORD(data.size()), &written,
+                            nullptr) &&
+                  written == DWORD(data.size());
+  CloseHandle(file);
+  return ok;
+}
 
 WindowsTunnelService::WindowsTunnelService(QObject* parent) : QObject(parent) {
   MZ_COUNT_CTOR(WindowsTunnelService);
@@ -139,11 +178,20 @@ bool WindowsTunnelService::start(const QString& configData) {
     service = nullptr;
   }
 
+  const QString configPath = tunnelConfigPath();
+  if (!writeSystemOnlyFile(configPath, configData.toUtf8())) {
+    WindowsUtils::windowsLog("Failed to write the tunnel configuration file");
+    return false;
+  }
+  // Read by the service before it reports SERVICE_RUNNING (windowsdaemontunnel.cpp), so it goes
+  // on every way out of start(), success included.
+  auto configGuard = qScopeGuard([&] { QFile::remove(configPath); });
+
   QString serviceCmdline;
   {
     QTextStream out(&serviceCmdline);
     out << "\"" << qApp->applicationFilePath() << "\" tunneldaemon \""
-        << configData << "\"";
+        << QDir::toNativeSeparators(configPath) << "\"";
   }
 
   logger.debug() << "Service:" << qApp->applicationFilePath();

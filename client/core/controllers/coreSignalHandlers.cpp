@@ -177,7 +177,10 @@ void CoreSignalHandlers::initImportControllerHandler()
 
         const int newServerIndex = m_coreController->m_serversController->getServersCount() - 1;
         const QString serverId = m_coreController->m_serversController->getServerId(newServerIndex);
-        if (!serverId.isEmpty()) {
+        // AresVPN Client (H-8): while signed in, Connect connects the session's rent (D187 rule 5).
+        // An imported file is stored, but it no longer takes the default from the session - that
+        // put Connect on the file, possibly another device's key, until the next session event.
+        if (!serverId.isEmpty() && !m_coreController->m_aresProfileController->hasSession()) {
             m_coreController->m_serversController->setDefaultServer(serverId);
         }
         if (m_coreController->m_serversUiController) {
@@ -294,8 +297,11 @@ void CoreSignalHandlers::initAutoConnectHandler()
             qDebug() << "auto-connect: on, but no rent is set up yet - nothing to connect to";
             return;
         }
-        if (ares->updateInfo().required) {
-            qDebug() << "auto-connect: refused, this version is below the console's minimum";
+        if (ares->signInNeeded()) {
+            // The refresh above was refused (401): the stored profile may be a removed device's or
+            // a retired rent's, and opening it unasked would leave the customer in Connecting. Home
+            // asks them to sign in; a Connect they press still uses it (plan 30 T02).
+            qDebug() << "auto-connect: refused, the console no longer accepts this device's sign-in";
             return;
         }
         if (aresTunnelUp()) {
@@ -431,7 +437,20 @@ void CoreSignalHandlers::initAndroidSettingsHandler()
             [](const QString &/*serverId*/, int removedIndex) {
                 AndroidController::instance()->resetLastServer(removedIndex);
             });
-    connect(m_coreController->m_appSettingsRepository, &SecureAppSettingsRepository::settingsCleared, []() { AndroidController::instance()->resetLastServer(-1); });
+    connect(m_coreController->m_appSettingsRepository, &SecureAppSettingsRepository::settingsCleared, []() {
+        AndroidController::instance()->resetLastServer(-1);
+        AndroidController::instance()->forgetLastConfig();
+    });
+    // AresVPN Client (K2-1): the VPN service keeps the last tunnel config it started - for a
+    // WireGuard rent, the device's private key - and starts it again unasked from Always-on, the
+    // Quick Settings tile and the notification's Connect. A sign-out (the one empty
+    // `sessionServerSet`) takes it with it, or the next person on the phone gets the rent back.
+    connect(m_coreController->m_aresProfileController, &AresProfileController::sessionServerSet, this,
+            [](const QString &serverId, bool) {
+                if (serverId.isEmpty()) {
+                    AndroidController::instance()->forgetLastConfig();
+                }
+            });
 #endif
 }
 
@@ -569,23 +588,38 @@ void CoreSignalHandlers::initAresSessionTunnelHandler()
                 const AresPending pending = m_aresPending;
                 m_aresPending = AresPending::None;
                 // Queued: work from a clean stack, not from inside the state change that closed it.
-                QTimer::singleShot(0, this, [this, pending]() {
-                    AresProfileController *ares = m_coreController->m_aresProfileController;
-                    if (pending == AresPending::RefreshThenReopen) {
-                        // No tunnel now: this request leaves by the ordinary route.
-                        ares->refreshSession(nullptr, kAresDirectRefreshMsecs);
-                    }
-                    aresAdoptSessionServer();
-                    if (ares->sessionServerId().isEmpty()) {
-                        qDebug() << "ares session: no session server - the tunnel stays closed";
-                        return;
-                    }
-                    if (aresTunnelUp()) {
-                        return;  // reopened meanwhile, by the customer
-                    }
-                    m_coreController->m_connectionUiController->openConnection();
-                });
+                QTimer::singleShot(0, this, [this, pending]() { aresAfterTunnelClosed(pending); });
             });
+}
+
+void CoreSignalHandlers::aresAfterTunnelClosed(AresPending pending)
+{
+    AresProfileController *ares = m_coreController->m_aresProfileController;
+    bool refreshBusy = false;
+    if (pending == AresPending::RefreshThenReopen) {
+        // No tunnel now: this request leaves by the ordinary route.
+        refreshBusy = ares->refreshSession(nullptr, kAresDirectRefreshMsecs).busy;
+    }
+    aresAdoptSessionServer();
+    switch (aresSession::afterTunnelClosed(refreshBusy, !ares->sessionServerId().isEmpty(), ares->signInNeeded(),
+                                           aresTunnelUp())) {
+    case aresSession::AfterClose::AskAgain:
+        // A poll that left through the closing tunnel is still on the wire (H2-V1); it ends within
+        // its own timeout. Reopening now would put the stale profile back unrefreshed.
+        qDebug() << "ares session: a refresh is still on the wire - asking again before reopening";
+        QTimer::singleShot(1000, this, [this, pending]() { aresAfterTunnelClosed(pending); });
+        return;
+    case aresSession::AfterClose::Leave:
+        if (ares->sessionServerId().isEmpty()) {
+            qDebug() << "ares session: no session server - the tunnel stays closed";
+        } else if (ares->signInNeeded()) {
+            qDebug() << "ares session: the console refused this device's sign-in - the tunnel stays closed until it signs in again";
+        }
+        return;
+    case aresSession::AfterClose::Reopen:
+        m_coreController->m_connectionUiController->openConnection();
+        return;
+    }
 }
 
 void CoreSignalHandlers::aresRepointTunnel(bool refreshWhileDown)

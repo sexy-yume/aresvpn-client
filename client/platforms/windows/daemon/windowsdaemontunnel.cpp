@@ -7,6 +7,7 @@
 #include <Windows.h>
 
 #include <QCoreApplication>
+#include <QFile>
 
 //#include "commandlineparser.h"
 #include "core/utils/constants.h"
@@ -41,7 +42,16 @@ int WindowsDaemonTunnel::run(QStringList& tokens) {
     logger.error() << "Expected 1 parameter only: the config file.";
     return 1;
   }
-  QString maybeConfig = tokens.at(1);
+  // AresVPN Client (K2-V1): the parameter is the path of the SYSTEM-only file
+  // WindowsTunnelService::start wrote for this start, never the config itself
+  // - the command line is the service's ImagePath, which any local user reads.
+  QFile configFile(tokens.at(1));
+  if (!configFile.open(QIODevice::ReadOnly)) {
+    logger.error() << "Cannot read the config file";
+    return 1;
+  }
+  QString maybeConfig = QString::fromUtf8(configFile.readAll());
+  configFile.close();
 
   if (!maybeConfig.startsWith("[Interface]")) {
     logger.error() << "parameter Does not seem to be a config";

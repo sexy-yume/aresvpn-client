@@ -152,6 +152,7 @@ QString errorString(ErrorCode code) {
     case(ErrorCode::AresNoSuchRent): errorMessage = QObject::tr("No rent with this idx under your account"); break;
     case(ErrorCode::AresEndpointUnreachable): errorMessage = QObject::tr("The AresVPN console could not be reached"); break;
     case(ErrorCode::AresRentNotImportable): errorMessage = QObject::tr("This rent cannot be used from this app"); break;
+    case(ErrorCode::AresUpdateRequired): errorMessage = QObject::tr("This version of the app is no longer supported. Install the update shown on the home screen to connect again."); break;
 
     case(ErrorCode::InternalError):
     default:

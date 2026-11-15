@@ -45,6 +45,12 @@ object Prefs {
     fun save(key: String, value: Float) =
         prefs.edit().putFloat(key, value).apply()
 
+    fun remove(vararg keys: String) {
+        val editor = prefs.edit()
+        keys.forEach { editor.remove(it) }
+        editor.apply()
+    }
+
     inline fun <reified T> load(key: String): T {
         return when (typeOf<T>()) {
             typeOf<Boolean>() -> prefs.getBoolean(key, false)

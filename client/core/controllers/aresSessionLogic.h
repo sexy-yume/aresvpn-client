@@ -55,6 +55,14 @@ namespace aresSession
     // (H-18). `stored` says the server is in the list at all - a missing one is always written.
     bool serverNeedsWrite(bool stored, const QString &sessionServerId, const QString &sessionIdentity,
                           const QString &serverId, const QString &identity);
+
+    // What the session's re-point routine does once the tunnel it closed reports Disconnected
+    // (plan 28). `refreshBusy`: the refresh it owed found another one on the wire and asked nothing
+    // (H2-V1) - ask again shortly rather than reopen unrefreshed. `signInNeeded`: the console refused
+    // the stored credential, so the stored profile is most likely what stalled the tunnel and is
+    // not reopened unasked (plan 30 T02). `tunnelUp`: the customer reopened it meanwhile.
+    enum class AfterClose { AskAgain, Leave, Reopen };
+    AfterClose afterTunnelClosed(bool refreshBusy, bool hasSessionServer, bool signInNeeded, bool tunnelUp);
 }
 
 #endif // ARESSESSIONLOGIC_H

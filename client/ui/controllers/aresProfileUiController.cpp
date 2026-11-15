@@ -33,15 +33,19 @@ AresProfileUiController::AresProfileUiController(AresProfileController *controll
 
     // #D187 says the client "refreshes when it can and says when it cannot". The saying was never
     // built: a background 401 or 404 went to a signal nothing listened to (plan 28, H-6). Only the
-    // two answers a customer can act on, or should know about, are shown; an unreachable console is
-    // the normal state of a dead tunnel and is handled, not announced.
+    // answers a customer can act on, or should know about, are shown; an unreachable console is
+    // the normal state of a dead tunnel and is handled, not announced. A 409 is the console
+    // refusing this device on the rent now behind the idx (a swap onto a rent at its device limit,
+    // plan 30 T02): the stored profile is the retired rent's, and only the customer can make room.
     connect(m_controller, &AresProfileController::sessionRefreshFailed, this,
-            [this](int httpStatus, bool, const QString &) {
+            [this](int httpStatus, bool, const QString &message) {
                 if (httpStatus == 401) {
                     setSessionProblem(tr("This device has to sign in again: the console no longer accepts the sign-in stored on it."));
                 } else if (httpStatus == 404) {
                     setSessionProblem(tr("No rent carries idx %1 right now. The app keeps checking and takes the new one as soon as it is assigned.")
                                               .arg(sessionIdx()));
+                } else if (httpStatus == 409) {
+                    setSessionProblem(message);
                 }
             });
     connect(m_controller, &AresProfileController::sessionRefreshed, this, [this]() { setSessionProblem(QString()); });

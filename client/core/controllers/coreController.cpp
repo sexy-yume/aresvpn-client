@@ -174,7 +174,7 @@ void CoreController::initCoreControllers()
 
 void CoreController::initControllers()
 {
-    m_connectionUiController = new ConnectionUiController(m_connectionController, m_serversController, this);
+    m_connectionUiController = new ConnectionUiController(m_connectionController, m_serversController, m_aresProfileController, this);
     setQmlContextProperty("ConnectionController", m_connectionUiController);
 
     if (m_engine) {

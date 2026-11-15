@@ -10,6 +10,8 @@
 #include "core/protocols/vpnProtocol.h"
 #include "core/controllers/serversController.h"
 
+class AresProfileController;
+
 class ConnectionUiController : public QObject
 {
     Q_OBJECT
@@ -21,6 +23,7 @@ public:
 
     explicit ConnectionUiController(ConnectionController* connectionController,
                                     ServersController* serversController,
+                                    AresProfileController* aresProfileController,
                                     QObject *parent = nullptr);
 
     ~ConnectionUiController() = default;
@@ -59,6 +62,7 @@ private:
 
     ConnectionController* m_connectionController;
     ServersController* m_serversController;
+    AresProfileController* m_aresProfileController;  // AresVPN Client: the min_version refusal (H2-5)
 
     bool m_isConnected = false;
     bool m_isConnectionInProgress = false;

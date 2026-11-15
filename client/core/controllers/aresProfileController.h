@@ -40,6 +40,8 @@ public:
         bool notModified = false; // 304 to a token refresh: nothing changed, nothing was imported
         bool superseded = false;  // the session was signed in or out while a background refresh
                                   // was on the wire; its answer was dropped, nothing was written
+        bool busy = false;        // another refresh was on the wire, so this one never asked the
+                                  // console; errorCode is not NoError, so no caller reads it as success
         QString refreshToken;  // a device token, from a console that issues them (plan 28); else empty
         QString etag;          // the console's ETag for this profile, sent back as If-None-Match
     };
@@ -97,8 +99,9 @@ public:
     QString sessionServerId() const;
 
     // True after the console refused the stored credential (401): the poll stops, the stored
-    // profile stays, and the customer is asked to sign in again. Cleared by a sign-in, or by a
-    // refresh the console accepts again.
+    // profile stays for a Connect the customer presses, nothing opens the tunnel on it unasked
+    // (auto-connect, the stall cycle's reopen: plan 30 T02), and the customer is asked to sign in
+    // again. Cleared by a sign-in, or by a refresh the console accepts again.
     bool signInNeeded() const { return m_signInNeeded; }
 
     // Sign in, or switch. REPLACES the session and takes the previous session's stored server and

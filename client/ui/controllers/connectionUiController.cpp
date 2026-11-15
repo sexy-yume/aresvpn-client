@@ -7,16 +7,19 @@
 #endif
 
 #include "amneziaApplication.h"
+#include "core/controllers/aresProfileController.h"
 #include "core/controllers/serversController.h"
 #include "core/models/containerConfig.h"
 #include "core/utils/containerEnum.h"
 
 ConnectionUiController::ConnectionUiController(ConnectionController* connectionController,
                                                 ServersController* serversController,
+                                                AresProfileController* aresProfileController,
                                                 QObject *parent)
     : QObject(parent),
       m_connectionController(connectionController),
-      m_serversController(serversController)
+      m_serversController(serversController),
+      m_aresProfileController(aresProfileController)
 {
     connect(m_connectionController, &ConnectionController::connectionStateChanged, this, &ConnectionUiController::onConnectionStateChanged);
 
@@ -30,6 +33,15 @@ void ConnectionUiController::openConnection()
     const QString serverId = m_serversController->getDefaultServerId();
     if (serverId.isEmpty()) {
         m_connectionController->setConnectionState(Vpn::ConnectionState::Disconnected);
+        return;
+    }
+
+    // AresVPN Client: below the console's min_version this build refuses to connect (D268). Here,
+    // because every way of opening a tunnel ends here - Home's Connect, auto-connect, the tray's
+    // Connect, the session's own reopen - and a check in each caller missed the tray (H2-5).
+    if (m_aresProfileController && m_aresProfileController->updateInfo().required) {
+        qWarning() << "connect refused: this version is below the console's minimum";
+        notifyConnectionBlocked(ErrorCode::AresUpdateRequired);
         return;
     }
 
